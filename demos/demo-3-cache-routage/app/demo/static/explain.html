@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Comment ça marche · Démo 3 · Valkey</title>
+<style>
+  :root{
+    --bg:#f5f6fb; --panel:#fff; --ink:#0b1033; --muted:#5a5f73; --brand:#000e9d; --brand2:#4a5bff;
+    --ok:#0a8f4e; --ko:#c4321b; --line:#e3e6f3; --code:#0b1033; --codeink:#d7dcff; --accent:#ff8a3d;
+    --simple:#2f7fe0; --complex:#e07a1f;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:18px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;align-items:center;gap:14px;padding:12px 24px;background:var(--brand);color:#fff;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0}
+  .tabs{display:flex;gap:6px}
+  .tabs a{color:#fff;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:15px;background:rgba(255,255,255,.12)}
+  .tabs a.on{background:#fff;color:var(--brand);font-weight:700}
+  .bar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:14px 24px;background:#fff;border-bottom:1px solid var(--line)}
+  .bar input[type=text]{flex:1;min-width:320px;font:inherit;padding:9px 12px;border:1px solid var(--line);border-radius:10px}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:9px 16px}
+  button.ghost{background:#fff;color:var(--brand)}
+  .sl{display:flex;flex-direction:column;font-size:13px;color:var(--muted);min-width:220px}
+  .sl b{color:var(--ink)}
+  .hint{font-size:13px;color:var(--muted)}
+  main{display:grid;grid-template-columns:minmax(320px,430px) minmax(0,1fr);gap:22px;padding:20px 24px 40px}
+  .cascade{position:relative;display:flex;flex-direction:column;gap:18px}
+  .stage{position:relative;display:grid;grid-template-columns:42px 1fr auto;gap:12px;align-items:center;background:#fff;border:2px solid var(--line);border-radius:14px;padding:12px 14px;cursor:pointer;transition:all .35s}
+  .stage .num{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;background:#eef0ff;color:var(--brand);font-weight:800}
+  .stage .t{font-weight:700}.stage .s{font-size:13px;color:var(--muted)}
+  .stage .cost{font-size:12px;text-align:right;color:var(--muted);line-height:1.3}
+  .stage .res{grid-column:2/4;font-size:14px;font-weight:700;display:none}
+  .stage.visited{border-color:#c9d0f5}
+  .stage.visited .res{display:block}
+  .stage.pass .res{color:var(--muted)}
+  .stage.stop{border-color:var(--ok);background:#f2fbf6;box-shadow:0 0 0 5px rgba(10,143,78,.12)}
+  .stage.stop .num{background:var(--ok);color:#fff}
+  .stage.stop .res{color:var(--ok)}
+  .stage.current{border-color:var(--brand2);box-shadow:0 0 0 5px rgba(74,91,255,.15)}
+  .stage.skipped{opacity:.35}
+  .stage::after{content:"";position:absolute;left:32px;bottom:-20px;width:3px;height:18px;background:#d5daf2}
+  .stage:last-child::after{display:none}
+  .bubble{position:absolute;left:-14px;width:28px;height:28px;border-radius:50%;background:var(--accent);color:#fff;font-weight:800;display:grid;place-items:center;box-shadow:0 4px 12px rgba(255,138,61,.5);transition:top .6s cubic-bezier(.4,.1,.2,1);z-index:3}
+  .detail{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 26px;min-height:520px}
+  .detail h2{margin:0 0 4px;font-size:28px;color:var(--brand)}
+  .detail .lead{font-size:18px;color:var(--muted);margin:0 0 16px}
+  .detail .lead b{color:var(--ink)}
+  .console{background:var(--code);color:var(--codeink);border-radius:10px;padding:10px 12px;font:14px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;margin:8px 0}
+  .flow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:10px 0;font-size:16px}
+  .flow code{background:#eef0ff;border-radius:6px;padding:3px 8px;font-size:14px}
+  .arrow{color:var(--muted)}
+  .verdict{margin-top:14px;font-size:20px;font-weight:800;padding:12px 16px;border-radius:12px}
+  .verdict.ok{background:#e9f7ef;color:var(--ok)}.verdict.next{background:#eef0ff;color:var(--brand)}
+  .heat{display:grid;grid-template-columns:repeat(48,1fr);gap:2px;max-width:640px;margin:10px 0}
+  .heat i{aspect-ratio:1;border-radius:2px}
+  .rows{display:grid;grid-template-columns:minmax(0,1fr) 260px 60px;gap:8px 12px;align-items:center;margin:12px 0}
+  .rows .q{font-size:15px}
+  .track{position:relative;height:14px;background:#eef0ff;border-radius:7px}
+  .track i{position:absolute;left:0;top:0;bottom:0;border-radius:7px}
+  .track .th{position:absolute;top:-5px;width:3px;height:24px;background:var(--ink);border-radius:2px}
+  .track .th span{position:absolute;top:-18px;left:-20px;font-size:11px;white-space:nowrap;color:var(--ink)}
+  .val{font-weight:800;font-size:15px;text-align:right}
+  .lab{display:inline-block;font-size:12px;font-weight:800;border-radius:6px;padding:1px 7px;margin-right:6px;color:#fff}
+  .lab.simple{background:var(--simple)}.lab.complex{background:var(--complex)}
+  .vote{display:flex;height:26px;border-radius:8px;overflow:hidden;margin:10px 0;font-size:13px;font-weight:800;color:#fff}
+  .vote div{display:grid;place-items:center;transition:width .6s}
+  .vote .s{background:var(--simple)}.vote .c{background:var(--complex)}
+  .models{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:10px}
+  .mcard{border:2px solid var(--line);border-radius:12px;padding:12px 14px}
+  .mcard.on{border-color:var(--brand2);box-shadow:0 0 0 4px rgba(74,91,255,.12)}
+  .mcard b{display:block;font-size:17px}
+  .mcard small{color:var(--muted)}
+  .nav{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}
+  .err{color:var(--ko);font-weight:700}
+  @media (max-width:1000px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Démo 3</h1>
+  <div class="tabs"><a href="/">Questions</a><a class="on" href="#">Comment ça marche</a></div>
+</header>
+<div class="bar">
+  <input type="text" id="q" placeholder="Une question à analyser…">
+  <button id="go">Analyser</button>
+  <label class="sl">Seuil du cache sémantique : <b id="thv"></b><input type="range" id="th" min="0.5" max="1" step="0.01"></label>
+  <label class="sl">Seuil de prudence du routeur : <b id="rmv"></b><input type="range" id="rm" min="0" max="0.9" step="0.01"></label>
+  <label class="hint" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="fresh" checked> comme si la question était nouvelle (ignorer sa propre réponse en cache)</label>
+  <span class="hint">Analyse sans appeler le modèle de génération. Bougez les seuils : la décision se recalcule.</span>
+</div>
+<main>
+  <div class="cascade" id="cascade">
+    <div class="bubble" id="bubble">?</div>
+  </div>
+  <section class="detail" id="detail"><p class="hint">Saisissez une question puis « Analyser ». La dernière question posée dans l'onglet « Questions » est reprise automatiquement.</p></section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const short = m => String(m||"").replace("-Instruct-2506","").replace("-24B","").replace("Mistral-Small-3.2","Mistral Small 3.2");
+const STAGES = [
+  {id:"exact",   t:"Cache exact",          s:"GET exact:<empreinte>",          cost:"~1 ms<br>0 €"},
+  {id:"embed",   t:"Question → vecteur",    s:"BGE-M3, 1 024 dimensions",       cost:"~50-200 ms<br>≈ 0 €"},
+  {id:"semantic",t:"Cache sémantique",     s:"FT.SEARCH idx:cache KNN",         cost:"~1 ms<br>0 €"},
+  {id:"route",   t:"Routage",              s:"FT.SEARCH idx:route KNN 5",       cost:"~1 ms<br>0 €"},
+  {id:"model",   t:"Appel du modèle",      s:"petit ou grand modèle",           cost:"1 à 10 s<br>tokens payés"},
+  {id:"store",   t:"Mise en cache",        s:"HSET + EXPIRE + SET",             cost:"~1 ms"},
+];
+const S = {tr:null, step:0, th:0.9, rm:0.45};
+
+function heat(v){ const t = Math.max(-1, Math.min(1, v / 0.08));
+  return t >= 0 ? `rgb(255,${Math.round(255-133*t)},${Math.round(255-229*t)})` : `rgb(${Math.round(255+228*t)},${Math.round(255+195*t)},255)`; }
+
+/* décision recalculée côté navigateur avec les seuils des curseurs */
+function decide(){
+  const tr = S.tr; if(!tr) return null;
+  const best = tr.semantic.neighbors[0];
+  const exactHit = tr.exact.hit;
+  const semHit = !exactHit && best && best.similarity >= S.th;
+  let label, reason;
+  const r = tr.route;
+  if(r.best < S.rm){ label = "complex"; reason = `aucun exemple assez proche (meilleur ${r.best} < ${S.rm}) : grand modèle par prudence`; }
+  else { label = (r.votes.simple || 0) >= (r.votes.complex || 0) ? "simple" : "complex"; reason = `vote des ${r.neighbors.length} exemples les plus proches`; }
+  const stop = exactHit ? 0 : semHit ? 2 : 5;
+  return {exactHit, semHit, best, label, reason, stop};
+}
+
+function renderCascade(){
+  const c = $("#cascade"), d = decide();
+  c.querySelectorAll(".stage").forEach(x => x.remove());
+  STAGES.forEach((st,i) => {
+    const el = document.createElement("div"); el.className = "stage"; el.dataset.i = i;
+    let res = "";
+    if(d){
+      if(i === 0) res = d.exactHit ? "Trouvé : réponse immédiate" : "Absent : on continue";
+      if(i === 1) res = `Vecteur calculé en ${S.tr.embed.ms} ms`;
+      if(i === 2) res = d.best ? (d.semHit ? `Similarité ${d.best.similarity} ≥ ${S.th} : réponse du cache` : `Meilleure similarité ${d.best.similarity} < ${S.th} : on continue`) : "Cache vide : on continue";
+      if(i === 3) res = `→ ${d.label === "simple" ? "petit modèle" : "grand modèle"}`;
+      if(i === 4) res = short(S.tr.models[d.label].model);
+      if(i === 5) res = "Réponse gardée 24 h";
+      if(i <= S.step) el.classList.add("visited", i === d.stop && i < 5 ? "stop" : "pass");
+      if(i > d.stop && d.stop < 5) el.classList.add("skipped");
+      if(i === S.step) el.classList.add("current");
+    }
+    el.innerHTML = `<span class="num">${i+1}</span><div><div class="t">${esc(st.t)}</div><div class="s">${esc(st.s)}</div></div><div class="cost">${st.cost}</div><div class="res">${esc(res)}</div>`;
+    el.onclick = () => { if(!d) return; S.step = Math.min(i, d.stop); renderAll(); };
+    c.appendChild(el);
+  });
+  const target = c.querySelectorAll(".stage")[S.step];
+  if(target) $("#bubble").style.top = (target.offsetTop + target.offsetHeight / 2 - 14) + "px";
+}
+
+function renderDetail(){
+  const tr = S.tr, d = decide(), box = $("#detail"); if(!tr) return;
+  const i = S.step; let h = "";
+  const nav = `<div class="nav"><button class="ghost" onclick="prev()">← Étape précédente</button><button onclick="next()">${i >= d.stop ? "Terminé" : "Étape suivante →"}</button></div>`;
+  if(i === 0){
+    h = `<h2>1 · Le cache exact</h2><p class="lead">La question est <b>normalisée</b> (minuscules, sans accents ni ponctuation), puis hachée. Si exactement la même question a déjà été posée, sa réponse est là, sans aucun calcul.</p>
+      <div class="flow"><span>« ${esc(tr.question)} »</span><span class="arrow">→</span><code>${esc(tr.normalized)}</code><span class="arrow">→</span><code>${esc(tr.exact.key)}</code></div>
+      <div class="console">${esc(tr.exact.command)}   →   ${tr.exact.hit ? "trouvé" : "(nil)"}   ·   ${tr.exact.ms} ms</div>
+      ${tr.already_cached && tr.ignore_same ? `<p class="hint">Cette question est déjà en cache (vous venez de la poser) : elle est ignorée pour rejouer son premier passage. Décochez l'option en haut pour voir l'état actuel.</p>` : ""}
+      <div class="verdict ${d.exactHit ? "ok" : "next"}">${d.exactHit ? `Trouvé (« ${esc(tr.exact.entry_question)} ») : réponse renvoyée, rien d'autre n'est exécuté.` : "Absent : il suffit d'un mot différent. On passe au cache sémantique."}</div>`;
+  }
+  if(i === 1){
+    h = `<h2>2 · La question devient un vecteur</h2><p class="lead">BGE-M3 transforme la question en <b>${tr.embed.dim} nombres</b>. C'est le seul appel de modèle avant la réponse, et ce vecteur sert <b>deux fois</b> : au cache sémantique et au routeur.</p>
+      <div class="heat">${tr.embed.preview.map(v => `<i style="background:${heat(v)}" title="${v}"></i>`).join("")}</div>
+      <p class="hint">Les 96 premières valeurs sur ${tr.embed.dim} · calculé en ${tr.embed.ms} ms par ${esc(tr.embed.model)}</p>
+      <div class="verdict next">Vecteur prêt : on interroge le cache sémantique.</div>`;
+  }
+  if(i === 2){
+    const n = tr.semantic.neighbors;
+    h = `<h2>3 · Le cache sémantique</h2><p class="lead">Valkey cherche, parmi les questions déjà répondues, celles dont le vecteur est le plus proche. Au-dessus du <b>seuil</b>, c'est la même question dite autrement : on renvoie la réponse.</p>
+      <div class="console">${esc(tr.semantic.command)}   ·   ${tr.semantic.ms} ms</div>` +
+      (n.length ? `<div class="rows">${n.map((x,k) => `<span class="q">${k === 0 ? "<b>" : ""}« ${esc(x.question)} »${k === 0 ? "</b>" : ""}</span>
+        <span class="track"><i style="width:${Math.round(x.similarity*100)}%;background:${x.similarity >= S.th ? "var(--ok)" : "#f0a090"}"></i><span class="th" style="left:${Math.round(S.th*100)}%">${k === 0 ? `<span>seuil ${S.th}</span>` : ""}</span></span>
+        <span class="val">${x.similarity}</span>`).join("")}</div>` : `<p>Le cache est vide : aucune question n'a encore été répondue.</p>`) +
+      `<div class="verdict ${d.semHit ? "ok" : "next"}">${d.semHit ? `Similarité ${d.best.similarity} ≥ ${S.th} : réponse servie par Valkey, 0 token, 0 €.` : `Aucune question assez proche : il faut appeler un modèle. Lequel ? C'est le rôle du routeur.`}</div>
+      <p class="hint">Essayez le curseur : à 0,70, une question voisine mais différente serait servie par le cache… avec la mauvaise réponse.</p>`;
+  }
+  if(i === 3){
+    const r = tr.route, s = Math.round((r.votes.simple||0)*100);
+    h = `<h2>4 · Le routage</h2><p class="lead">La question n'a <b>pas besoin d'être dans la liste d'exemples</b> : on cherche les ${r.k} exemples <b>les plus proches en sens</b> (routes.yaml), et ils votent, chacun avec un poids égal à sa similarité.</p>
+      <div class="console">${esc(r.command)}   ·   ${r.ms} ms</div>
+      <div class="rows">${r.neighbors.map(x => `<span class="q"><span class="lab ${x.label}">${x.label === "simple" ? "simple" : "complexe"}</span>${esc(x.text)}${x.origin === "appris" ? " <i>(appris)</i>" : ""}</span>
+        <span class="track"><i style="width:${Math.round(x.similarity*100)}%;background:var(--${x.label})"></i><span class="th" style="left:${Math.round(S.rm*100)}%"></span></span><span class="val">${x.similarity}</span>`).join("")}</div>
+      <div class="vote"><div class="s" style="width:${s}%">${s ? `simple ${s} %` : ""}</div><div class="c" style="width:${100-s}%">${100-s ? `complexe ${100-s} %` : ""}</div></div>
+      <p class="hint">Trait noir : seuil de prudence (${S.rm}). Si même l'exemple le plus proche est en dessous, la question ne ressemble à rien de connu : grand modèle par sécurité.</p>
+      <div class="verdict next">→ ${d.label === "simple" ? "Petit modèle" : "Grand modèle"} : ${esc(d.reason)}.</div>`;
+  }
+  if(i === 4){
+    const m = tr.models, p = x => x.price ? `${String(x.price[0]).replace(".", ",")} € / ${String(x.price[1]).replace(".", ",")} € par million de tokens (entrée / sortie)` : "prix inconnu";
+    h = `<h2>5 · L'appel du modèle</h2><p class="lead">C'est la <b>seule étape qui coûte des tokens</b>, et la plus lente. Tout le reste de la cascade sert à l'éviter, ou à la rendre moins chère.</p>
+      <div class="models">${["simple","complex"].map(l => `<div class="mcard ${d.label === l ? "on" : ""}"><span class="lab ${l}">${l === "simple" ? "petit modèle" : "grand modèle"}</span><b>${esc(short(m[l].model))}</b><small>${p(m[l])}</small>
+        <p style="font-size:15px;margin:.5em 0 0">${l === "simple" ? "Rapide, répond en une à quelques secondes." : "Modèle de raisonnement : il « réfléchit » avant de répondre, ces tokens de réflexion sont facturés."}</p></div>`).join("")}</div>
+      <div class="verdict next">La question part vers ${esc(short(m[d.label].model))}.</div>`;
+  }
+  if(i === 5){
+    h = `<h2>6 · La mise en cache</h2><p class="lead">La réponse est enregistrée avec le vecteur de la question. <b>La prochaine reformulation s'arrêtera à l'étape 3</b>, la même question retapée à l'étape 1.</p>
+      <div class="console">HSET cache:&lt;id&gt; question "${esc(tr.question.slice(0,40))}…" answer "…" model ${esc(tr.models[d.label].model)} tokens_in … embedding &lt;vecteur&gt;
+EXPIRE cache:&lt;id&gt; ${tr.cache_ttl}
+SET ${esc(tr.exact.key)} cache:&lt;id&gt; EX ${tr.cache_ttl}</div>
+      <div class="verdict ok">Une seule fois payé, ensuite servi par Valkey pendant ${Math.round(tr.cache_ttl/3600)} h.</div>`;
+  }
+  box.innerHTML = h + nav;
+}
+function renderAll(){ renderCascade(); renderDetail(); }
+function next(){ const d = decide(); if(d && S.step < d.stop){ S.step++; renderAll(); } }
+function prev(){ if(S.step > 0){ S.step--; renderAll(); } }
+document.addEventListener("keydown", e => { if(e.target.tagName === "INPUT" && e.target.type === "text") return;
+  if(["ArrowRight","PageDown"," "].includes(e.key)){ e.preventDefault(); next(); }
+  if(["ArrowLeft","PageUp"].includes(e.key)){ e.preventDefault(); prev(); } });
+
+async function analyse(){
+  const q = $("#q").value.trim(); if(!q) return;
+  $("#detail").innerHTML = '<p class="hint">Analyse en cours…</p>';
+  try {
+    const r = await fetch("/api/trace?q=" + encodeURIComponent(q) + "&ignore_same=" + $("#fresh").checked); if(!r.ok) throw new Error(await r.text());
+    S.tr = await r.json(); S.step = 0;
+    if(!S.init){ S.th = S.tr.semantic.threshold; S.rm = S.tr.route.min_similarity; $("#th").value = S.th; $("#rm").value = S.rm; S.init = true; }
+    $("#thv").textContent = S.th; $("#rmv").textContent = S.rm;
+    renderAll();
+  } catch(e){ $("#detail").innerHTML = `<p class="err">Erreur : ${esc(e.message)}</p>`; }
+}
+$("#go").onclick = analyse;
+$("#fresh").onchange = analyse;
+$("#q").onkeydown = e => { if(e.key === "Enter") analyse(); };
+$("#th").oninput = e => { S.th = +e.target.value; $("#thv").textContent = S.th; const d = decide(); if(d) S.step = Math.min(S.step, d.stop); renderAll(); };
+$("#rm").oninput = e => { S.rm = +e.target.value; $("#rmv").textContent = S.rm; renderAll(); };
+window.addEventListener("resize", renderCascade);
+
+renderCascade();
+let last = null; try { last = sessionStorage.getItem("demo3-last"); } catch {}
+const qs = new URLSearchParams(location.search).get("q");
+$("#q").value = qs || last || "Quelle est la différence entre Valkey et Redis ?";
+analyse();
+</script>
+</body>
+</html>

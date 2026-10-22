@@ -1,0 +1,18 @@
+# torch CPU est installé séparément dans le Dockerfile (index PyTorch CPU, image plus légère)
+valkey==6.1.0
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+pydantic==2.10.4
+pillow==11.1.0
+numpy==2.2.1
+sentence-transformers==3.3.1
+datasets==3.2.0
+pillow-heif==0.21.0
+# dépendances transitives figées (combinaison testée fin 2024 / début 2025)
+transformers==4.46.3
+huggingface-hub==0.26.5
+pyarrow==18.1.0
+pandas==2.2.3
+scikit-learn==1.5.2
+scipy==1.14.1

@@ -1,0 +1,52 @@
+# Démo 1 – Recherche visuelle et hybride avec Valkey Search
+# Utiliser le Makefile : `make up TARGET=local|local-offline|ovhcloud|aiven` (voir README.md)
+name: demo1-valkey
+
+services:
+  # Valkey local avec les modules Search / JSON / Bloom (uniquement pour TARGET=local et local-offline)
+  valkey:
+    image: valkey/valkey-bundle:9.1
+    profiles: ["local"]
+    environment:
+      # snapshot toutes les 60 s s'il y a eu une écriture : données ET index survivent à un redémarrage
+      VALKEY_EXTRA_FLAGS: "--save 60 1"
+    ports: ["127.0.0.1:6379:6379"]   # accessible uniquement depuis le portable
+    volumes: ["valkey-data:/data"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  # Application : API + interface web + scripts de chargement
+  app:
+    build: ./app
+    env_file: ["${ENV_FILE:-env/local.env}"]
+    environment:
+      DATA_DIR: /data
+      # 1 = n'utilise que le cache local des modèles (aucun accès réseau à Hugging Face) : à activer sur scène
+      HF_HUB_OFFLINE: ${OFFLINE:-0}
+    ports: ["8000:8000"]
+    volumes:
+      - ./data:/data          # images, catalog.csv, cache des embeddings
+      - models:/models        # cache des modèles Hugging Face (CLIP)
+      - ./certs:/certs:ro     # certificat CA du service managé si nécessaire
+    depends_on:
+      valkey:
+        condition: service_healthy
+        required: false
+
+  # valkey-cli pointé sur la cible courante (pour montrer les commandes en live)
+  cli:
+    image: valkey/valkey-bundle:9.1
+    profiles: ["tools"]
+    env_file: ["${ENV_FILE:-env/local.env}"]
+    volumes: ["./certs:/certs:ro", "./cli:/cli:ro"]
+    depends_on:
+      valkey:
+        condition: service_healthy
+        required: false
+    entrypoint: ["sh", "-c", "exec valkey-cli -u \"$$VALKEY_URL\" $${VALKEY_CA_CERT:+--cacert $$VALKEY_CA_CERT} \"$$@\"", "--"]
+
+volumes:
+  valkey-data:
+  models:

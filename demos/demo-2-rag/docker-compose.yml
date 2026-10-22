@@ -1,0 +1,57 @@
+# Démo 2 – Assistant RAG avec Valkey et AI Endpoints
+# Utiliser le Makefile : `make up TARGET=local|local-offline|ovh|aiven` (voir README.md)
+name: demo2-valkey
+
+services:
+  # Valkey local avec les modules (cibles local et local-offline). Port 6380 côté portable
+  # pour pouvoir lancer la démo 1 (6379) en même temps.
+  valkey:
+    image: valkey/valkey-bundle:9.1
+    profiles: ["local"]
+    environment:
+      # snapshot toutes les 60 s s'il y a eu une écriture : données ET index survivent à un redémarrage
+      VALKEY_EXTRA_FLAGS: "--save 60 1"
+    ports: ["127.0.0.1:6380:6379"]
+    volumes: ["valkey-data:/data"]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 2s
+      retries: 30
+
+  app:
+    build: ./app
+    env_file:
+      - path: ${ENV_FILE:-env/local.env}
+        required: true
+      - path: env/secrets.env          # clé AI Endpoints (non versionnée)
+        required: false
+    environment:
+      DATA_DIR: /data
+      SOURCES_FILE: /srv/sources.yaml
+    ports: ["127.0.0.1:8001:8000"]
+    volumes:
+      - ./data:/data
+      - ./sources.yaml:/srv/sources.yaml:ro
+      - ./certs:/certs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # Ollama installé sur le portable (cible local-offline)
+    depends_on:
+      valkey:
+        condition: service_healthy
+        required: false
+
+  cli:
+    image: valkey/valkey-bundle:9.1
+    profiles: ["tools"]
+    env_file:
+      - path: ${ENV_FILE:-env/local.env}
+        required: true
+    volumes: ["./certs:/certs:ro"]
+    entrypoint: ["sh", "-c", "exec valkey-cli -u \"$$VALKEY_URL\" $${VALKEY_CA_CERT:+--cacert $$VALKEY_CA_CERT} \"$$@\"", "--"]
+    depends_on:
+      valkey:
+        condition: service_healthy
+        required: false
+
+volumes:
+  valkey-data:

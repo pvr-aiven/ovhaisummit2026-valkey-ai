@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Démo 1 · Recherche visuelle et hybride · Valkey</title>
+<style>
+  :root{
+    --bg:#f5f6fb; --panel:#fff; --ink:#0b1033; --muted:#5a5f73; --brand:#000e9d; --brand2:#4a5bff;
+    --ok:#0a8f4e; --ko:#c4321b; --line:#e3e6f3; --code:#0b1033; --codeink:#d7dcff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;align-items:center;gap:16px;padding:14px 24px;background:var(--brand);color:#fff}
+  header h1{font-size:20px;margin:0;font-weight:700}
+  header .pill{font-size:13px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:999px}
+  header .spacer{flex:1}
+  .tabs{display:flex;gap:6px;margin-left:12px}
+  .tabs a{color:#fff;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:15px;background:rgba(255,255,255,.12)}
+  .tabs a.on{background:#fff;color:var(--brand);font-weight:700}
+  main{display:grid;grid-template-columns:300px 1fr;gap:20px;padding:20px 24px;align-items:start}
+  aside,.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px}
+  aside{position:sticky;top:16px}
+  h2{font-size:15px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:0 0 12px}
+  label{display:block;font-weight:600;margin:14px 0 6px}
+  .row{display:flex;gap:8px;align-items:center}
+  input[type=number],input[type=text]{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 11px;cursor:pointer;font-size:14px}
+  .chip.on{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .switch{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px;border-radius:10px;background:#eef0ff;margin-top:8px}
+  .switch b{font-size:16px}
+  button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:8px 14px}
+  button.ghost{background:#fff;color:var(--brand)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:14px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;cursor:pointer;position:relative;transition:transform .08s}
+  .card:hover{transform:translateY(-2px);border-color:var(--brand2)}
+  .card img{width:100%;aspect-ratio:3/4;object-fit:contain;background:#fff;display:block;image-rendering:auto}
+  .card .meta{padding:8px 10px;font-size:13px}
+  .card .name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .card .sub{color:var(--muted);display:flex;justify-content:space-between}
+  .badge{position:absolute;top:8px;left:8px;background:var(--brand);color:#fff;font-weight:700;font-size:14px;padding:3px 8px;border-radius:8px}
+  .stock0{position:absolute;top:8px;right:8px;background:var(--ko);color:#fff;font-size:12px;padding:3px 7px;border-radius:6px}
+  .card .act{display:flex;gap:6px;padding:0 10px 10px}
+  .card .act button{flex:1;padding:4px 6px;font-size:12px}
+  .query{display:flex;gap:18px;align-items:center}
+  .query img{width:150px;aspect-ratio:3/4;object-fit:contain;background:#fff;border:2px solid var(--brand);border-radius:12px}
+  .query .title{font-size:22px;font-weight:700}
+  .console{background:var(--code);color:var(--codeink);border-radius:12px;padding:14px 16px;font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap;word-break:break-all}
+  .console .k{color:#8fa2ff}.console .lat{color:#7fe0a0;font-weight:700}
+  .stats{display:flex;gap:18px;margin:10px 0 0;color:var(--muted);font-size:14px}
+  .stats b{color:var(--ink)}
+  section{margin-bottom:20px}
+  .drop{border:2px dashed var(--brand2);border-radius:12px;padding:14px;text-align:center;color:var(--muted);cursor:pointer}
+  .drop.hover{background:#eef0ff}
+  .hint{font-size:13px;color:var(--muted)}
+  .hidden{display:none}
+</style>
+</head>
+<body>
+<header>
+  <h1>Démo 1 · Recherche visuelle et hybride</h1>
+  <div class="tabs"><a class="on" href="/">Recherche</a><a id="tabExplain" href="/comment-ca-marche" title="Explique la dernière recherche, étape par étape">Comment ça marche</a></div>
+  <span class="pill" id="target">…</span>
+  <span class="pill" id="docs">…</span>
+  <span class="spacer"></span>
+  <button class="ghost" id="backBtn" style="background:#fff">↺ Catalogue</button>
+</header>
+<main>
+  <aside>
+    <h2>Requête</h2>
+    <div class="drop" id="drop">📷 Glisser une photo ici<br><span class="hint">ou cliquer pour choisir un fichier</span></div>
+    <input type="file" id="file" accept="image/*" class="hidden">
+    <label for="text">Ou décrire en français</label>
+    <div class="row"><input type="text" id="text" placeholder="baskets rouges pour courir"><button id="textBtn">→</button></div>
+
+    <div class="switch"><b>Mode hybride</b><input type="checkbox" id="hybrid"></div>
+    <p class="hint">Désactivé : similarité pure. Activé : la recherche vectorielle est filtrée par les critères ci-dessous, dans la même requête.</p>
+
+    <label>Genre</label>
+    <div class="chips" id="genders"></div>
+    <label>Type</label>
+    <div class="chips" id="cats"></div>
+    <label>Prix (€)</label>
+    <div class="row"><input type="number" id="pmin" placeholder="min"><input type="number" id="pmax" placeholder="max"></div>
+    <label class="row" style="gap:10px"><input type="checkbox" id="instock"> En stock uniquement</label>
+  </aside>
+
+  <div>
+    <section id="querySec" class="panel hidden">
+      <h2>Produit de référence</h2>
+      <div class="query"><img id="qimg" alt=""><div><div class="title" id="qtitle"></div><div class="hint" id="qsub"></div></div></div>
+    </section>
+
+    <section class="panel">
+      <h2>Commande envoyée à Valkey</h2>
+      <div class="console" id="console">Cliquer sur un produit du catalogue pour lancer une recherche par similarité.</div>
+      <div class="stats"><span>Résultats : <b id="total">–</b></span><span>Latence : <b id="lat">–</b></span></div>
+    </section>
+
+    <section>
+      <h2 id="gridTitle">Catalogue</h2>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const eur = v => Number(v || 0).toFixed(2) + " €";
+const GENDER_FR = {men:"Homme", women:"Femme", unisex:"Unisexe", boys:"Garçon", girls:"Fille"};
+const state = {gender:null, cats:new Set(), mode:"browse", last:null};
+
+function filters(){
+  if(!$("#hybrid").checked) return {};
+  const f = {gender: state.gender, categories:[...state.cats], in_stock: $("#instock").checked};
+  if($("#pmin").value) f.price_min = +$("#pmin").value;
+  if($("#pmax").value) f.price_max = +$("#pmax").value;
+  return f;
+}
+function chip(container, label, on, click){
+  const b = document.createElement("span"); b.className = "chip"+(on?" on":""); b.textContent = label;
+  b.onclick = click; container.appendChild(b);
+}
+function renderChips(meta){
+  const g = $("#genders"); g.innerHTML = "";
+  meta.genders.forEach(x => chip(g, GENDER_FR[x]||x, state.gender===x, () => {state.gender = state.gender===x?null:x; $("#hybrid").checked = true; renderChips(meta); rerun();}));
+  const c = $("#cats"); c.innerHTML = "";
+  meta.categories.forEach(([slug,label]) => chip(c, label, state.cats.has(slug), () => {state.cats.has(slug)?state.cats.delete(slug):state.cats.add(slug); $("#hybrid").checked = true; renderChips(meta); rerun();}));
+}
+function showConsole(r){
+  explainLink();
+  const cmd = esc(r.command).replace(/^(FT\.SEARCH|HSET)/, '<span class="k">$1</span>');
+  $("#console").innerHTML = cmd + (r.latency_ms!==undefined ? `\n<span class="lat">→ ${r.latency_ms} ms</span>` : "");
+  if(r.total!==undefined) $("#total").textContent = r.total;
+  if(r.latency_ms!==undefined) $("#lat").textContent = r.latency_ms + " ms";
+}
+function card(d, withScore, rank){
+  const el = document.createElement("div"); el.className = "card";
+  el.innerHTML = `
+    ${withScore && d.similarity!==undefined ? `<span class="badge">${state.mode==="text" ? "#"+rank : Math.round(d.similarity*100)+" %"}</span>`:""}
+    ${d.stock===0 ? `<span class="stock0">Rupture</span>`:""}
+    <img loading="lazy" src="/images/${encodeURIComponent(d.image)}" alt="">
+    <div class="meta"><div class="name" title="${esc(d.name)}">${esc(d.name)}</div>
+      <div class="sub"><span>${GENDER_FR[d.gender]||d.gender}</span><span><b>${eur(d.price)}</b></span></div>
+      <div class="sub"><span>${esc((d.category||"").replace(/_/g," "))}</span><span>stock ${d.stock}</span></div></div>
+    ${withScore ? `<div class="act"><button class="ghost" data-s="0">Rupture</button><button class="ghost" data-s="10">Réassort</button></div>`:""}`;
+  el.onclick = e => {
+    if(e.target.dataset.s!==undefined){ e.stopPropagation(); setStock(d.key, +e.target.dataset.s); return; }
+    byProduct(d);
+  };
+  return el;
+}
+function renderGrid(r, title, withScore){
+  $("#gridTitle").textContent = title;
+  const g = $("#grid"); g.innerHTML = "";
+  r.results.forEach((d,i) => g.appendChild(card(d, withScore, i+1)));
+  if(!r.results.length) g.innerHTML = '<p class="hint">Aucun résultat avec ces filtres.</p>';
+}
+function fail(e){ $("#console").textContent = "Erreur : " + e.message; }
+window.addEventListener("unhandledrejection", ev => fail(ev.reason || new Error("inconnue")));
+async function api(path, body){
+  const opt = body instanceof FormData ? {method:"POST", body} : body ? {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body)} : {};
+  const r = await fetch(path, opt); if(!r.ok) throw new Error(await r.text()); return r.json();
+}
+async function browse(){
+  state.mode = "browse"; $("#querySec").classList.add("hidden");
+  const f = filters(), p = new URLSearchParams({count:36});
+  if(f.gender) p.set("gender", f.gender);
+  if(f.categories?.length) p.set("category", f.categories.join(","));
+  if(f.price_min!==undefined) p.set("price_min", f.price_min);
+  if(f.price_max!==undefined) p.set("price_max", f.price_max);
+  if(f.in_stock) p.set("in_stock", "true");
+  const r = await api("/api/browse?"+p); showConsole(r); renderGrid(r, "Catalogue", false);
+}
+function setQuery(img, title, sub){
+  $("#querySec").classList.remove("hidden"); $("#qimg").style.display = ""; $("#qimg").src = img; $("#qtitle").textContent = title; $("#qsub").textContent = sub;
+}
+async function byProduct(d){
+  state.mode = "product"; state.last = d;
+  setQuery(`/images/${encodeURIComponent(d.image)}`, d.name, `${GENDER_FR[d.gender]||d.gender} · ${eur(d.price)} · ${d.key}`);
+  const r = await api("/api/search/product", {key:d.key, k:12, filters:filters()});
+  showConsole(r); renderGrid(r, $("#hybrid").checked ? "Produits similaires (filtrés)" : "Produits similaires", true);
+}
+async function byFile(file){
+  state.mode = "file"; state.last = file;
+  setQuery(URL.createObjectURL(file), "Photo importée", file.name);
+  const fd = new FormData(); fd.append("file", file); fd.append("filters", JSON.stringify(filters())); fd.append("k", "12");
+  const r = await api("/api/search/image", fd); showConsole(r); renderGrid(r, "Produits qui ressemblent à la photo", true);
+}
+async function byText(){
+  const t = $("#text").value.trim(); if(!t) return;
+  state.mode = "text"; state.last = t;
+  $("#querySec").classList.remove("hidden"); $("#qimg").removeAttribute("src"); $("#qimg").style.display = "none"; $("#qtitle").textContent = "« "+t+" »"; $("#qsub").textContent = "Texte vectorisé par CLIP multilingue";
+  const r = await api("/api/search/text", {text:t, k:12, filters:filters()}); showConsole(r); renderGrid(r, "Produits correspondant à la description", true);
+}
+function explainLink(){
+  // l'onglet « Comment ça marche » rejoue la dernière recherche par produit, avec ses filtres
+  const p = new URLSearchParams(), f = filters();
+  if(state.mode==="product" && state.last) p.set("key", state.last.key);
+  if(f.gender) p.set("gender", f.gender);
+  if(f.categories?.length) p.set("category", f.categories.join(","));
+  if(f.price_min!==undefined) p.set("price_min", f.price_min);
+  if(f.price_max!==undefined) p.set("price_max", f.price_max);
+  if(f.in_stock) p.set("in_stock", "true");
+  $("#tabExplain").href = "/comment-ca-marche" + (p.toString() ? "?" + p : "");
+}
+function rerun(){
+  if(state.mode==="product") return byProduct(state.last);
+  if(state.mode==="file") return byFile(state.last);
+  if(state.mode==="text") return byText();
+  return browse();
+}
+async function setStock(key, stock){
+  const r = await api("/api/stock", {key, stock}); showConsole(r);
+  setTimeout(rerun, 600); // laisser le temps de lire la commande HSET avant de relancer la recherche
+}
+
+// événements
+["#hybrid","#instock"].forEach(s => $(s).onchange = rerun);
+["#pmin","#pmax"].forEach(s => $(s).onchange = () => { $("#hybrid").checked = true; rerun(); });
+$("#textBtn").onclick = byText; $("#text").onkeydown = e => { if(e.key==="Enter") byText(); };
+$("#backBtn").onclick = browse;
+const drop = $("#drop");
+drop.onclick = () => $("#file").click();
+$("#file").onchange = e => { const f = e.target.files[0]; e.target.value = ""; if(f) byFile(f); };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("hover"); };
+drop.ondragleave = () => drop.classList.remove("hover");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("hover"); e.dataTransfer.files[0] && byFile(e.dataTransfer.files[0]); };
+
+(async () => {
+  const meta = await api("/api/meta");
+  $("#target").textContent = `Cible : ${meta.target} · ${meta.valkey}`;
+  $("#docs").textContent = `${meta.num_docs} produits indexés · ${meta.index}`;
+  const qs = new URLSearchParams(location.search);
+  if(qs.get("gender")||qs.get("category")||qs.get("price_min")||qs.get("price_max")||qs.get("in_stock")){
+    $("#hybrid").checked = true; state.gender = qs.get("gender") || null;
+    (qs.get("category")||"").split(",").filter(Boolean).forEach(c => state.cats.add(c));
+    if(qs.get("price_min")) $("#pmin").value = qs.get("price_min");
+    if(qs.get("price_max")) $("#pmax").value = qs.get("price_max");
+    $("#instock").checked = qs.get("in_stock")==="true";
+  }
+  renderChips(meta);
+  if(qs.get("key")){
+    const p = await api("/api/product/" + encodeURIComponent(qs.get("key"))).catch(() => null);  // retour depuis « Comment ça marche »
+    if(p){ const f = p.fields; byProduct({key:p.key, name:f.name, gender:f.gender, price:+f.price, image:f.image}); return; }
+  }
+  browse();
+})().catch(e => { $("#console").textContent = "Erreur : " + e.message; });
+</script>
+</body>
+</html>

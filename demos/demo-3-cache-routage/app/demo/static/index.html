@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Démo 3 · Cache et routage sémantiques · Valkey</title>
+<style>
+  :root{
+    --bg:#f5f6fb; --panel:#fff; --ink:#0b1033; --muted:#5a5f73; --brand:#000e9d; --brand2:#4a5bff;
+    --ok:#0a8f4e; --ko:#c4321b; --line:#e3e6f3; --code:#0b1033; --codeink:#d7dcff; --accent:#ff8a3d; --cache:#0a8f4e;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:17px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;align-items:center;gap:12px;padding:12px 24px;background:var(--brand);color:#fff;flex-wrap:wrap}
+  header h1{font-size:20px;margin:0 8px 0 0}
+  .pill{font-size:13px;background:rgba(255,255,255,.15);padding:4px 10px;border-radius:999px;white-space:nowrap}
+  .pill.warn{background:#ffb37a;color:#0b1033}
+  .tabs{display:flex;gap:6px}
+  .tabs a{color:#fff;text-decoration:none;padding:6px 14px;border-radius:999px;font-size:15px;background:rgba(255,255,255,.12)}
+  .tabs a.on{background:#fff;color:var(--brand);font-weight:700}
+  main{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:20px;padding:18px 24px;height:calc(100vh - 58px)}
+  .col{display:flex;flex-direction:column;min-height:0;background:var(--panel);border:1px solid var(--line);border-radius:16px}
+  .col h2{font-size:14px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0;padding:14px 18px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:center}
+  .col h2 .r{margin-left:auto;text-transform:none;letter-spacing:0;display:flex;gap:6px}
+  #feed{flex:1;overflow:auto;padding:14px 18px}
+  .q{margin:14px 0 6px auto;background:var(--brand);color:#fff;border-radius:14px 14px 4px 14px;padding:9px 13px;width:fit-content;max-width:90%}
+  .a{border:1px solid var(--line);border-radius:14px;padding:12px 15px;margin-bottom:6px;background:#fff}
+  .a.cache{border-color:#9fd9b9;background:#f2fbf6}
+  .a .hd{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+  .tag{font-size:13px;font-weight:700;border-radius:8px;padding:3px 9px;background:#eef0ff;color:var(--brand)}
+  .tag.cache{background:var(--cache);color:#fff}.tag.simple{background:#e3f1ff;color:#0b4fa8}.tag.complex{background:#fff1e3;color:#9a4b00}
+  .lat{font-size:22px;font-weight:800;margin-left:auto}
+  .lat.fast{color:var(--cache)}.lat.slow{color:#9a4b00}
+  .a .sub{font-size:13px;color:var(--muted)}
+  .a .body p{margin:.3em 0}.a .body ul,.a .body ol{margin:.3em 0;padding-left:1.3em}
+  .a code{background:#e6e9fb;border-radius:5px;padding:1px 5px;font:14px ui-monospace,Menlo,monospace}
+  .a pre{background:var(--code);color:var(--codeink);border-radius:10px;padding:10px;overflow:auto;font:13px/1.5 ui-monospace,Menlo,monospace}
+  .a .ft{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-top:8px;font-size:13px;color:var(--muted)}
+  .a .ft b{color:var(--ink)}
+  .a .ft .saved{color:var(--cache);font-weight:700}
+  .think{font-size:13px;color:var(--muted);background:#fafbff;border-left:3px solid #c9a2ff;padding:6px 10px;margin:6px 0;max-height:120px;overflow:auto;white-space:pre-wrap}
+  .composer{border-top:1px solid var(--line);padding:12px 16px}
+  .groups{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:6px;margin-bottom:10px}
+  .chip{border:1px solid #dfe3f7;background:#eef0ff;border-radius:10px;padding:6px 10px;cursor:pointer;font-size:13px;text-align:left}
+  .chip b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--brand2)}
+  .row{display:flex;gap:8px;align-items:center}
+  textarea{flex:1;font:inherit;padding:10px 12px;border:1px solid var(--line);border-radius:10px;resize:none;height:50px}
+  button{font:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--brand);background:var(--brand);color:#fff;padding:9px 15px}
+  button.ghost{background:#fff;color:var(--brand)}
+  button.small{padding:3px 9px;font-size:12px;border-radius:7px}
+  button:disabled{opacity:.5;cursor:wait}
+  .opts{display:flex;flex-wrap:wrap;gap:16px;margin-top:10px;font-size:14px;color:var(--muted)}
+  .opts label{display:flex;gap:6px;align-items:center;cursor:pointer}
+  .counters{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+  .ctr{border-radius:12px;padding:10px 12px;background:#f7f8ff}
+  .ctr .v{font-size:28px;font-weight:800;color:var(--brand);line-height:1.1}
+  .ctr.green .v{color:var(--cache)}
+  .ctr .l{font-size:13px;color:var(--muted)}
+  .proj{grid-column:1/-1;font-size:14px;color:var(--ink);background:#f2fbf6;border-radius:10px;padding:8px 12px}
+  #steps{flex:1;overflow:auto;padding:12px 16px}
+  .step{border:1px solid var(--line);border-radius:12px;padding:9px 12px;margin-bottom:8px;animation:in .25s ease}
+  @keyframes in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .step .h{display:flex;gap:8px;align-items:center;font-weight:700;font-size:15px}
+  .step .n{width:22px;height:22px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;font-size:12px;flex:none}
+  .step .ms{margin-left:auto;font-size:12px;color:var(--ok);background:#e9f7ef;border-radius:6px;padding:1px 7px}
+  .step .ms.llm{color:#9a4b00;background:#fff1e3}
+  .step .b{font-size:13px;margin-top:5px}
+  .step.hit{border-color:var(--cache);background:#f2fbf6}.step.miss{border-color:#f3c7bf}
+  .console{background:var(--code);color:var(--codeink);border-radius:8px;padding:6px 9px;font:12px/1.5 ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-all;margin-top:4px}
+  .vote{display:flex;height:10px;border-radius:5px;overflow:hidden;margin:6px 0}
+  .vote i{display:block}.vote .s{background:#5aa2f0}.vote .c{background:#ff9f4a}
+  .nb{display:grid;grid-template-columns:70px 1fr 46px;gap:2px 8px;font-size:12px}
+  .nb .lab{font-weight:700}.nb .lab.simple{color:#0b4fa8}.nb .lab.complex{color:#9a4b00}
+  .gauge{position:relative;height:12px;background:#eef0ff;border-radius:6px;margin:6px 0}
+  .gauge i{position:absolute;left:0;top:0;bottom:0;border-radius:6px}
+  .gauge b{position:absolute;top:-3px;width:2px;height:18px;background:var(--ink)}
+  .empty{color:var(--muted);padding:16px;font-size:14px}
+  .err{color:var(--ko);font-weight:700}
+  .typing::after{content:"▍";animation:blink 1s steps(1) infinite;color:var(--brand2)}
+  @keyframes blink{50%{opacity:0}}
+  @media (max-width:1100px){main{grid-template-columns:1fr;height:auto}.col{min-height:60vh}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Démo 3 · Cache et routage sémantiques</h1>
+  <div class="tabs"><a class="on" href="/">Questions</a><a id="tabExplain" href="/comment-ca-marche" title="Explique la cascade pour la dernière question">Comment ça marche</a></div>
+  <span class="pill" id="pTarget">…</span>
+  <span class="pill" id="pModels">…</span>
+  <span class="pill" id="pCache">…</span>
+</header>
+<main>
+  <section class="col">
+    <h2>Questions <span class="r"><button class="ghost small" id="clearCache">Vider le cache</button><button class="ghost small" id="resetStats">Compteurs à zéro</button></span></h2>
+    <div id="feed"><div class="empty">Commencez par la première question : elle part vers un modèle (quelques secondes). Posez ensuite sa reformulation : la réponse vient de Valkey en quelques millisecondes.</div></div>
+    <div class="composer">
+      <div class="groups" id="groups"></div>
+      <div class="row"><textarea id="q" placeholder="Posez une question…"></textarea><button id="send">Envoyer</button></div>
+      <div class="opts">
+        <label><input type="checkbox" id="useCache" checked> cache sémantique</label>
+        <label><input type="checkbox" id="useRouter" checked> routage (sinon tout va au grand modèle)</label>
+      </div>
+    </div>
+  </section>
+  <section class="col">
+    <h2>Compteurs en direct <span class="r" id="statsKey"></span></h2>
+    <div class="counters">
+      <div class="ctr green"><div class="v" id="cSaved">0 €</div><div class="l">économisés (vs tout au grand modèle, sans cache)</div></div>
+      <div class="ctr green"><div class="v" id="cTok">0</div><div class="l">tokens économisés par le cache</div></div>
+      <div class="ctr"><div class="v" id="cHit">0 %</div><div class="l">réponses servies par le cache (<span id="cReq">0</span> questions)</div></div>
+      <div class="ctr"><div class="v" id="cLat">–</div><div class="l">latence moyenne : modèle / cache</div></div>
+      <div class="ctr"><div class="v" id="cRoute">0 / 0</div><div class="l">appels petit modèle / grand modèle</div></div>
+      <div class="ctr"><div class="v" id="cCost">0 €</div><div class="l">réellement dépensés (sur <span id="cBase">0 €</span>)</div></div>
+      <div class="proj" id="proj">Projection : posez quelques questions pour estimer l'économie sur 1 million de requêtes.</div>
+    </div>
+    <h2>Sous le capot <span class="r" id="totalTop"></span></h2>
+    <div id="steps"><div class="empty">Chaque étape s'affiche ici avec la commande envoyée à Valkey ou au modèle.</div></div>
+  </section>
+</main>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const GROUPS = [
+  ["1 · Première question", "Quelle est la différence entre Valkey et Redis ?"],
+  ["2 · Reformulation", "En quoi Valkey se distingue-t-il de Redis ?"],
+  ["2 bis · Autre reformulation", "Valkey vs Redis : quelles différences ?"],
+  ["3 · Cas limite (question voisine)", "Quelle est la différence entre Valkey et Memcached ?"],
+  ["4 · Simple → petit modèle", "Comment supprimer une clé dans Valkey ?"],
+  ["5 · Complexe → grand modèle", "Conçois une stratégie de cache sémantique pour un chatbot de support à 2 millions de questions par mois, avec seuils, invalidation et estimation des coûts."],
+];
+const S = {busy:false, meta:null};
+const eur = v => { v = Number(v||0); return v === 0 ? "0 €" : v < 0.01 ? v.toFixed(6).replace(".", ",") + " €" : v.toFixed(4).replace(".", ",") + " €"; };
+const eurBig = v => Number(v||0).toLocaleString("fr-FR", {maximumFractionDigits: v >= 100 ? 0 : 2}) + " €";
+const ms = v => v == null ? "–" : v >= 1000 ? (v/1000).toFixed(1).replace(".", ",") + " s" : (v < 10 ? Number(v).toFixed(1) : Math.round(v)) + " ms";
+const short = m => String(m||"").replace("-Instruct-2506","").replace("-24B","").replace("Mistral-Small-3.2","Mistral Small 3.2");
+
+function md(text){
+  return String(text).split(/```/).map((b,i) => {
+    if(i % 2) return `<pre>${esc(b.replace(/^\w*\n/, ""))}</pre>`;
+    let h = esc(b).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+    let out = "", list = null;
+    for(const l of h.split("\n")){
+      const ul = l.match(/^\s*[-*]\s+(.*)/), ol = l.match(/^\s*\d+[.)]\s+(.*)/);
+      if(ul || ol){ const t = ul ? "ul" : "ol"; if(list !== t){ if(list) out += `</${list}>`; out += `<${t}>`; list = t; } out += `<li>${(ul||ol)[1]}</li>`; continue; }
+      if(list){ out += `</${list}>`; list = null; }
+      if(l.trim()) out += `<p>${l.replace(/^#+\s*/, "")}</p>`;
+    }
+    return out + (list ? `</${list}>` : "");
+  }).join("");
+}
+
+/* ---------- compteurs ---------- */
+function renderStats(s){
+  if(!s) return;
+  $("#cSaved").textContent = eur(s.cost_saved);
+  $("#cTok").textContent = (s.tokens_saved||0).toLocaleString("fr-FR");
+  $("#cHit").textContent = Math.round((s.hit_rate||0)*100) + " %";
+  $("#cReq").textContent = s.requests||0;
+  $("#cLat").textContent = `${ms(s.avg_ms_llm)} / ${ms(s.avg_ms_cache)}`;
+  $("#cRoute").textContent = `${s.calls_simple||0} / ${s.calls_complex||0}`;
+  $("#cCost").textContent = eur(s.cost_real); $("#cBase").textContent = eur(s.cost_baseline);
+  if(s.requests){
+    const per = s.cost_saved / s.requests, pct = s.cost_baseline ? Math.round(100 * s.cost_saved / s.cost_baseline) : 0;
+    $("#proj").innerHTML = `Projection : <b>1 million de questions</b> comme celles-ci → <b>${eurBig(per * 1e6)} économisés</b> (${pct} % de la facture), et ${Math.round((s.hit_rate||0)*1e6).toLocaleString("fr-FR")} réponses servies en millisecondes.`;
+  }
+}
+async function refreshStats(){ try { const s = await (await fetch("/api/stats")).json(); renderStats(s); $("#pCache").textContent = `${s.cache_size} réponse(s) en cache`; } catch {} }
+
+/* ---------- sous le capot ---------- */
+let n = 0;
+const TITLE = {exact:"Cache exact", embed:"Question → vecteur", semantic:"Cache sémantique", route:"Routage", generate:"Génération", store:"Mise en cache", stats:"Compteurs"};
+function step(name, d){
+  n++; const el = document.createElement("div"); el.className = "step";
+  let b = "", t = d.ms ?? d.total_ms;
+  if(name === "exact"){ el.classList.add(d.hit ? "hit" : "miss"); b = `<div class="console">${esc(d.command)}</div><div>${d.hit ? "Trouvé : même question, au caractère près." : "Absent : la question n'a jamais été posée exactement ainsi."}</div>`; }
+  if(name === "embed") b = `<div>${esc(d.model)} · ${d.dim} dimensions · un seul vecteur, réutilisé par le cache et le routeur</div>`;
+  if(name === "semantic"){ el.classList.add(d.hit ? "hit" : "miss");
+    const sim = d.similarity ?? 0;
+    b = `<div class="console">${esc(d.command)}</div>
+      <div class="gauge"><i style="width:${Math.round(sim*100)}%;background:${d.hit ? "var(--cache)" : "#f0a090"}"></i><b style="left:${Math.round(d.threshold*100)}%" title="seuil"></b></div>
+      <div>${d.matched ? `Plus proche : « ${esc(d.matched)} » · similarité <b>${sim}</b> ${d.hit ? "≥" : "<"} seuil ${d.threshold}` : "Cache vide"} → <b>${d.hit ? "réponse servie par Valkey" : "appel au modèle"}</b></div>`; }
+  if(name === "route"){
+    const v = d.votes || {}, s = Math.round((v.simple||0)*100);
+    b = (d.command ? `<div class="console">${esc(d.command)}</div>` : "") +
+      (d.neighbors.length ? `<div class="vote"><i class="s" style="width:${s}%"></i><i class="c" style="width:${100-s}%"></i></div><div class="nb">` +
+        d.neighbors.map(x => `<span class="lab ${x.label}">${x.label === "simple" ? "simple" : "complexe"}</span><span>${esc(x.text)}${x.origin === "appris" ? " <i>(appris)</i>" : ""}</span><span>${x.similarity}</span>`).join("") + `</div>` : "") +
+      `<div>→ <b>${d.label === "simple" ? "petit modèle" : "grand modèle"} : ${esc(short(d.model))}</b> · ${esc(d.reason)}</div>`; }
+  if(name === "generate"){ t = d.total_ms; b = `<div>${esc(short(d.model))} · premier token ${ms(d.first_token_ms)} · ${d.prompt_tokens} → ${d.completion_tokens} tokens · coût ${eur(d.cost)} (tarif ${esc(d.price_model)})${d.usage_reported ? "" : " · tokens estimés"}</div>`; }
+  if(name === "store") b = d.commands.map(c => `<div class="console">${esc(c)}</div>`).join("") + `<div>La prochaine question proche sera servie depuis Valkey.</div>`;
+  if(name === "stats") b = `<div class="console">${esc(d.commands.join("\n"))}</div>`;
+  el.innerHTML = `<div class="h"><span class="n">${n}</span>${TITLE[name]||name}${t != null ? `<span class="ms ${name === "generate" ? "llm" : ""}">${ms(t)}</span>` : ""}</div><div class="b">${b}</div>`;
+  $("#steps").appendChild(el); $("#steps").scrollTop = 1e9;
+}
+
+/* ---------- envoi ---------- */
+async function ask(question){
+  if(S.busy || !question.trim()) return;
+  S.busy = true; $("#send").disabled = true; $("#q").value = "";
+  try { sessionStorage.setItem("demo3-last", question); } catch {}
+  $("#tabExplain").href = "/comment-ca-marche?q=" + encodeURIComponent(question);
+  if($("#feed .empty")) $("#feed").innerHTML = "";
+  $("#feed").insertAdjacentHTML("beforeend", `<div class="q">${esc(question)}</div>`);
+  const card = document.createElement("div"); card.className = "a";
+  card.innerHTML = `<div class="hd"><span class="tag">…</span><span class="lat" data-t0="${performance.now()}"></span></div><div class="think" hidden></div><div class="body typing"></div><div class="ft"></div>`;
+  $("#feed").appendChild(card); $("#feed").scrollTop = 1e9;
+  $("#steps").innerHTML = ""; n = 0;
+  const body = card.querySelector(".body"), think = card.querySelector(".think"), lat = card.querySelector(".lat");
+  const timer = setInterval(() => { lat.textContent = ms(performance.now() - lat.dataset.t0); }, 100);
+  let text = "", reasoning = "", done = false;
+  try {
+    const r = await fetch("/api/ask", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({question, use_cache:$("#useCache").checked, use_router:$("#useRouter").checked})});
+    if(!r.ok) throw new Error(await r.text());
+    const rd = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for(;;){
+      const {value, done:end} = await rd.read(); if(end) break;
+      buf += dec.decode(value, {stream:true}); let i;
+      while((i = buf.indexOf("\n\n")) >= 0){
+        const line = buf.slice(0, i).trim(); buf = buf.slice(i + 2);
+        if(!line.startsWith("data:")) continue;
+        const e = JSON.parse(line.slice(5));
+        if(e.type === "step"){ step(e.name, e.data);
+          if(e.name === "route"){ const tg = card.querySelector(".tag"); tg.className = "tag " + e.data.label; tg.textContent = `${e.data.label === "simple" ? "Petit modèle" : "Grand modèle"} · ${short(e.data.model)}`; } }
+        else if(e.type === "reasoning"){ reasoning += e.text; think.hidden = false; think.textContent = "Réflexion du modèle… " + reasoning.slice(-600); think.scrollTop = 1e9; }
+        else if(e.type === "token"){ text += e.text; body.innerHTML = md(text); $("#feed").scrollTop = 1e9; }
+        else if(e.type === "done"){ done = true; finish(card, e, reasoning); }
+        else if(e.type === "error") throw new Error(e.message);
+      }
+    }
+    if(!done) throw new Error("flux interrompu");
+  } catch(err){ body.classList.remove("typing"); body.innerHTML += `<p class="err">Erreur : ${esc(err.message)}</p>`; }
+  clearInterval(timer);
+  S.busy = false; $("#send").disabled = false; $("#q").focus();
+}
+
+function finish(card, e, reasoning){
+  const body = card.querySelector(".body"), tg = card.querySelector(".tag"), lat = card.querySelector(".lat"), ft = card.querySelector(".ft");
+  body.classList.remove("typing"); body.innerHTML = md(e.answer);
+  lat.textContent = ms(e.latency_ms); lat.className = "lat " + (e.source.startsWith("cache") ? "fast" : "slow");
+  if(e.source.startsWith("cache")){
+    card.classList.add("cache"); tg.className = "tag cache";
+    tg.textContent = e.source === "cache exact" ? "Cache exact · Valkey" : `Cache sémantique · Valkey · similarité ${e.similarity}`;
+    ft.innerHTML = `<span>dont <b>${ms(e.valkey_ms)} dans Valkey</b>${e.embed_ms != null ? ` (+ ${ms(e.embed_ms)} pour vectoriser la question)` : ""}</span>
+      <span>Réponse de « ${esc(e.original_question)} » (${esc(short(e.model))}, ${ms(e.original_llm_ms)} à l'origine)</span>
+      <span>coût <b>0 €</b></span><span class="saved">${(e.tokens||0).toLocaleString("fr-FR")} tokens et ${eur(e.saved)} économisés</span>`;
+  } else {
+    if(reasoning){ const th = card.querySelector(".think"); th.textContent = `Réflexion du modèle (${reasoning.split(/\s+/).length} mots, facturés comme des tokens de sortie)`; }
+    ft.innerHTML = `<span><b>${(e.tokens||0).toLocaleString("fr-FR")}</b> tokens</span><span>coût <b>${eur(e.cost)}</b></span>` +
+      (e.saved > 0 ? `<span class="saved">${eur(e.saved)} économisés grâce au routage</span>` : "") +
+      `<span style="margin-left:auto">Routage juste ? <button class="ghost small" data-l="simple">c'était simple</button> <button class="ghost small" data-l="complex">c'était complexe</button></span>`;
+    ft.querySelectorAll("button[data-l]").forEach(btn => btn.onclick = () => teach(card.previousElementSibling.textContent, btn.dataset.l, btn));
+  }
+  renderStats(e.stats); refreshStats();
+}
+
+async function teach(question, label, btn){
+  const r = await (await fetch("/api/teach", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({question, label})})).json();
+  btn.parentElement.innerHTML = `Exemple ajouté au routeur (${label === "simple" ? "simple" : "complexe"}) · <code>${esc(r.command)}</code>`;
+}
+
+$("#send").onclick = () => ask($("#q").value);
+$("#q").onkeydown = e => { if(e.key === "Enter" && !e.shiftKey){ e.preventDefault(); ask($("#q").value); } };
+$("#groups").innerHTML = GROUPS.map(([g,q]) => `<span class="chip"><b>${esc(g)}</b>${esc(q)}</span>`).join("");
+document.querySelectorAll("#groups .chip").forEach((c,i) => c.onclick = () => ask(GROUPS[i][1]));
+$("#clearCache").onclick = async () => { await fetch("/api/reset?what=cache", {method:"POST"}); refreshStats();
+  $("#steps").innerHTML = '<div class="empty">Cache vidé : les clés cache:* et exact:* ont été supprimées de Valkey.</div>'; };
+$("#resetStats").onclick = async () => { await fetch("/api/reset?what=stats", {method:"POST"}); refreshStats(); };
+
+(async () => {
+  const m = await (await fetch("/api/meta")).json(); S.meta = m;
+  $("#pTarget").textContent = `Cible : ${m.target} · ${m.valkey}`;
+  $("#pModels").textContent = `petit : ${short(m.simple_model)} · grand : ${short(m.complex_model)} @ ${m.llm_host}`;
+  $("#pCache").textContent = m.ready ? `${m.cache_size} réponse(s) en cache · seuil ${m.cache_threshold}` : "index absents : make load";
+  if(!m.ready) $("#pCache").classList.add("warn");
+  $("#statsKey").textContent = "hash Valkey stats:demo3";
+  renderStats(m.stats);
+})().catch(e => $("#feed").innerHTML = `<p class="err">Erreur au chargement : ${esc(e.message)}</p>`);
+</script>
+</body>
+</html>

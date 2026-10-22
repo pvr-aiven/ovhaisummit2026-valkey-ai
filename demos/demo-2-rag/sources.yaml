@@ -1,0 +1,198 @@
+# Base de connaissance de la démo 2.
+# Chaque entrée : url (Markdown ou HTML), source (filtre TAG), type (doc | blog).
+# Licences : documentation Valkey CC BY-SA 4.0 (attribution via les liens sources affichés),
+# documentation OVHcloud, documentation et blog Aiven : contenus publics, cités avec leur lien. Vérifier avant usage public.
+sources:
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-capabilities.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-prepare-for-incoming-connections.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-connect-cli.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-connect-python.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-advanced-parameters-references.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/databases/valkey-update-acls.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-getting-started.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-capabilities.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-billing.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-catalog-api.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-structured-output.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-function-calling.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-virtual-models.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-rag-chatbot-langchain.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-chatbot-memory-langchain.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://docs.ovhcloud.com/en/guides/public-cloud/ai-machine-learning/ai-endpoints-troubleshooting.md
+    source: ovhcloud-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/search.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/search-query.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/search-data-formats.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/valkey-bundle.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/valkey-json.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/bloomfilters.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/hashes.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/data-types.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/streams-intro.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/pubsub.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/persistence.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/replication.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/cluster-tutorial.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/lru-cache.md
+    source: valkey-docs
+    type: doc
+  - url: https://raw.githubusercontent.com/valkey-io/valkey-doc/main/topics/acl.md
+    source: valkey-docs
+    type: doc
+# Modèles AI Endpoints : catalogue public (capacités, contexte, licences) et page des prix (tarifs à jour)
+  - url: https://catalog.endpoints.ai.ovh.net/rest/v1/models_v2
+    kind: ai-endpoints-catalog
+    source: ovhcloud-docs
+    type: doc
+  - url: https://www.ovhcloud.com/en/public-cloud/prices/
+    kind: html-section
+    section: ai-endpoints
+    title: OVHcloud Public Cloud prices – AI Endpoints (excl. VAT)
+    source: ovhcloud-docs
+    type: doc
+# Documentation Aiven for Valkey (version Markdown servie par aiven.io/docs/…md)
+  - url: https://aiven.io/docs/products/valkey.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/get-started.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/high-availability.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/memory-usage.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/read-replica.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/valkey-cluster.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/valkey-free-tier.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/concepts/lua-scripts.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/connect-python.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/connect-valkey-cli.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/connect-node.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/connect-java.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/manage-ssl-connectivity.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/configure-acl-permissions.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/manage-service-users.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/migrate-redis-aiven-via-console.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/valkey-version-upgrade.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/prepare-for-high-load.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/estimate-max-number-of-connections.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/benchmark-performance.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/howto/create-valkey-read-replica.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/reference/valkey-modules.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/reference/restricted-commands.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/reference/advanced-params.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/reference/version-lifecycle.md
+    source: aiven-docs
+    type: doc
+  - url: https://aiven.io/docs/products/valkey/troubleshooting/troubleshoot-connection-issues.md
+    source: aiven-docs
+    type: doc
+# Articles de blog Aiven
+  - url: https://aiven.io/blog/index-your-valkey-cache-and-start-searching
+    source: aiven-blog
+    type: blog
+  - url: https://aiven.io/blog/right-sizing-your-model-usage-with-valkey-and-semantic-routing
+    source: aiven-blog
+    type: blog
+  - url: https://aiven.io/blog/valkey-json-module-now-available-on-aiven-for-valkey
+    source: aiven-blog
+    type: blog

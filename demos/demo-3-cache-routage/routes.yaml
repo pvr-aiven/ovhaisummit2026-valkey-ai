@@ -1,0 +1,40 @@
+# Exemples du routeur sémantique. Une nouvelle question est comparée à ces exemples (KNN dans Valkey) :
+# la majorité de ses plus proches voisins décide du modèle. Ajouter des exemples suffit à corriger le routage.
+simple:
+  - Qu'est-ce que Valkey ?
+  - Traduis « bonjour » en anglais.
+  - Combien font 12 fois 7 ?
+  - Donne-moi la commande pour lire une clé dans Valkey.
+  - Quel port utilise Valkey par défaut ?
+  - Résume ce paragraphe en une phrase.
+  - Corrige l'orthographe de cette phrase.
+  - Que signifie TTL ?
+  - Quelle est la capitale de l'Australie ?
+  - Écris un message de bienvenue court pour une newsletter.
+  - Convertis 5 kilomètres en miles.
+  - Qu'est-ce qu'un embedding ?
+  - Comment supprimer une clé dans Valkey ?
+  - Donne trois synonymes de « rapide ».
+  - Quelle est la différence entre une liste et un set ?
+  - Reformule cette phrase de façon plus polie.
+  - Quel est le format d'une date ISO 8601 ?
+  - Comment afficher les clés qui commencent par user ?
+  - Qu'est-ce que le RAG ?
+  - Quelle est la différence entre Valkey et Redis ?
+complex:
+  - Conçois une architecture RAG multi-tenant avec Valkey, gestion des droits et observabilité.
+  - Rédige un plan de migration de Redis OSS vers Valkey pour 30 nœuds en production, avec risques et calendrier.
+  - Compare trois stratégies de cache pour une API à fort trafic et recommande la meilleure, chiffres à l'appui.
+  - Démontre que la somme des n premiers entiers impairs vaut n au carré.
+  - Analyse les compromis entre HNSW et FLAT pour 50 millions de vecteurs et propose un dimensionnement.
+  - Un train part à 8 h à 90 km/h, un autre à 9 h à 120 km/h sur la même voie ; quand le rattrape-t-il ? Explique chaque étape.
+  - Écris un service Python asynchrone qui consomme un stream Valkey, avec reprise sur erreur et tests unitaires.
+  - Évalue les risques RGPD d'un chatbot qui garde l'historique des conversations et propose des mesures.
+  - Propose un modèle de coût détaillé pour servir 10 millions de requêtes LLM par mois avec cache et routage.
+  - Explique pas à pas comment diagnostiquer une latence p99 qui double chaque nuit sur un cluster Valkey.
+  - Rédige une stratégie de tests de charge pour une recherche vectorielle hybride, avec métriques et seuils.
+  - Optimise un algorithme de tri pour des données presque triées et justifie sa complexité.
+  - Construis un plan de reprise après sinistre multi-région pour une base Valkey critique.
+  - Compare fine-tuning et RAG pour un assistant juridique, avec avantages, coûts et risques.
+  - Conçois un schéma de données pour un moteur de recommandation temps réel combinant vecteurs et filtres.
+  - Trois boîtes sont toutes mal étiquetées ; en ne tirant qu'un seul fruit, comment rétablir les étiquettes ? Justifie.
