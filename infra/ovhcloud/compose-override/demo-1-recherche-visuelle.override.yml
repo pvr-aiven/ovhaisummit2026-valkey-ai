@@ -1,0 +1,5 @@
+# Copied on the VM as demos/demo-1-recherche-visuelle/docker-compose.override.yml.
+# Publishes the app on the VM's private IP only, where the load balancer reaches it.
+services:
+  app:
+    ports: !override ["10.42.0.10:8000:8000"]

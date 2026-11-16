@@ -12,6 +12,8 @@ make <commande> TARGET=aiven           # Aiven for Valkey (+ AI Gateway)
 
 `TARGET=ovh` reste accepté (alias de `ovhcloud`). Chaque cible lit `env/<cible>.env` : copier `env/<cible>.env.example` pour `ovhcloud` et `aiven`.
 
+Pour faire tourner les trois démos sur OVHcloud en réseau privé (base sans adresse publique, VM sans IP publique, load balancer filtré par IP) : voir [`../infra/ovhcloud/`](../infra/ovhcloud/README.md).
+
 | Commande | Rôle (identique dans chaque démo) |
 |---|---|
 | `make help` | liste des commandes et cible courante |

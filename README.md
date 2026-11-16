@@ -57,16 +57,21 @@ make <command> TARGET=aiven           # Aiven for Valkey
 
 For `ovhcloud` and `aiven`, copy `env/<target>.env.example` to `env/<target>.env` and fill in the service URI. Full details in [demos/README.md](demos/README.md) and each demo's README.
 
+### Private network on OVHcloud
+
+[infra/ovhcloud/](infra/ovhcloud/README.md) runs the three demos on OVHcloud with Terraform: Managed Valkey 9.1 with no public address, a VM without a public IP on the same private subnet, and a load balancer that only lets the allowed IPs reach the UIs.
+
 ## Repository layout
 
 ```
 ├── session.md, session-en.md     slide sources (FR / EN)
 ├── valkey-ai-summit2026*.pdf/pptx generated decks
 ├── images/                       diagrams (images/en/ for the English deck)
-└── demos/
-    ├── demo-1-recherche-visuelle/
-    ├── demo-2-rag/
-    └── demo-3-cache-routage/
+├── demos/
+│   ├── demo-1-recherche-visuelle/
+│   ├── demo-2-rag/
+│   └── demo-3-cache-routage/
+└── infra/ovhcloud/               Terraform: the demos on OVHcloud, in a private network
 ```
 
 No secret is versioned: `*.env` files, keys and certificates are ignored by Git; only `*.env.example` templates are committed.
