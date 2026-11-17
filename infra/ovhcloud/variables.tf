@@ -49,7 +49,7 @@ variable "demo_cidrs" {
 
 variable "repo_url" {
   type    = string
-  default = "https://github.com/pvr-aiven/ovhsummit2006-valkey-ai.git"
+  default = "https://github.com/pvr-aiven/ovhaisummit2026-valkey-ai.git"
 }
 
 variable "repo_commit" {

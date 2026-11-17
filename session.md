@@ -115,7 +115,7 @@ Notes : Ce sont exactement les champs de la démo 1 : FT.CREATE idx:products ON 
 # HNSW ou FLAT ?
 
 ## FLAT : exact
-- Compare la requête à **tous** les vecteurs : recherche **KNN** (*k-nearest neighbors*, les k plus proches voisins)
+- Compare la requête à **tous** les vecteurs : recherche **KNN** (*k-nearest neighbours*, les k plus proches voisins)
 - Trouve **toujours** les vrais plus proches voisins
 - Coût proportionnel au volume : pour les petits jeux de données
 
@@ -405,12 +405,12 @@ Notes : Donner le lien vers le repo des démos. Inviter à passer au stand pour 
 - Les trois démos : code, Docker Compose et mode opératoire
 - **Local** en une commande : `make prepare && make up`
 - Cibles **OVHcloud** (Managed Valkey + AI Endpoints) et **Aiven** prêtes
-- github.com/pvr-aiven/ovhsummit2006-valkey-ai
+- github.com/pvr-aiven/ovhaisummit2026-valkey-ai
 
 Notes : Laisser la slide quelques secondes pour que la salle scanne le QR code. Rappeler que tout tourne en local avec Docker, et qu'il suffit de changer de cible pour passer sur OVHcloud ou Aiven.
 
 ---
 
 # Merci !
-Code des démos : github.com/pvr-aiven/ovhsummit2006-valkey-ai. Retrouvons-nous au stand pour en discuter.
+Code des démos : github.com/pvr-aiven/ovhaisummit2026-valkey-ai. Retrouvons-nous au stand pour en discuter.
 <!-- layout: fin -->

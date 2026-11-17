@@ -29,8 +29,8 @@ Demos 1 and 3 have a **"Comment ça marche"** tab that replays, step by step, wh
 Requirements: Docker with **Compose ≥ 2.24**, `make`, ~6 GB of disk space.
 
 ```bash
-git clone git@github.com:pvr-aiven/ovhsummit2006-valkey-ai.git
-cd ovhsummit2006-valkey-ai/demos/demo-1-recherche-visuelle
+git clone git@github.com:pvr-aiven/ovhaisummit2026-valkey-ai.git
+cd ovhaisummit2026-valkey-ai/demos/demo-1-recherche-visuelle
 make prepare      # build, dataset, embeddings, index, checks (10-15 min the first time)
 make up           # → http://localhost:8000
 ```
