@@ -27,10 +27,79 @@ SYSTEM_NO_RAG = "Tu es un assistant. Réponds dans la langue de la question, de 
 NO_ANSWER = ("Je ne trouve pas cette information dans les sources autorisées : aucun extrait n'est assez proche "
              "de la question. Élargissez les sources ou reformulez.")
 
-REWRITE = """Voici une conversation puis une nouvelle question. Réécris la nouvelle question pour qu'elle soit
-compréhensible seule : remplace les « ça », « et pour… », « celui-là » par ce qu'ils désignent, et reprends
-le sujet technique précis de la conversation (produit, commande, type de recherche).
-Ne réponds pas à la question. Renvoie uniquement la question réécrite, sur une ligne."""
+REWRITE = """Tu réécris des questions, tu n'y réponds jamais.
+On te donne la fin d'une conversation, puis une nouvelle question qui y fait référence (« et pour… », « ça »,
+« celui-là »…). Réécris la nouvelle question pour qu'elle soit compréhensible seule, en remplaçant ces références
+par ce qu'elles désignent dans la conversation.
+Règles :
+- Garde le sens, la langue et les produits de la nouvelle question. Ne remplace jamais un produit qu'elle cite.
+- N'ajoute un produit de la conversation que si la nouvelle question y fait clairement référence.
+- Ne réponds pas, n'explique pas, ne t'excuse pas.
+Renvoie uniquement la question réécrite, sur une ligne, terminée par « ? »."""
+
+# Une question n'est reformulée que si elle dépend visiblement de la conversation. Une question autonome
+# (« Comment créer un index vectoriel dans Valkey ? ») part telle quelle : la reformuler lui faisait parfois
+# hériter du sujet précédent (Elasticsearch…) ou recevoir une réponse au lieu d'une question.
+_FOLLOW_UP = re.compile(
+    r"^\s*(et|mais|alors|donc|aussi|pareil|idem|sinon|ok|d'accord)\b"
+    r"|\b(ça|cela|ceci|celui|celle|ceux|celles|celui-ci|celle-ci|celui-là|celle-là|dessus|là-dessus|y"
+    r"|le même|la même|les mêmes|précédent|précédente|précédemment|ci-dessus|leur|leurs)\b",
+    re.IGNORECASE)
+PRODUCTS = ("valkey", "redis", "ovhcloud", "ovh", "aiven", "opensearch", "elasticsearch", "postgresql",
+            "postgres", "pgvector", "memcached", "kafka", "mongodb")
+_REFUSALS = ("je ne trouve", "je ne sais", "je n'ai pas", "désolé", "aucun extrait", "je ne peux")
+
+
+def products(text: str) -> set[str]:
+    t = text.lower()
+    found = {p for p in PRODUCTS if re.search(rf"\b{p}\b", t)}
+    if "ovhcloud" in found:
+        found.discard("ovh")
+    if "postgresql" in found:
+        found.discard("postgres")
+    return found
+
+
+def needs_rewrite(question: str) -> bool:
+    """Vrai si la question dépend de la conversation : mot de liaison, pronom, ou question très courte."""
+    return bool(_FOLLOW_UP.search(question)) or len(re.findall(r"\w+", question)) <= 3
+
+
+def check_rewrite(question: str, rewritten: str, past: list[dict] | None = None) -> tuple[str, str | None]:
+    """Valide la reformulation. Renvoie (question à utiliser, raison du rejet ou None).
+
+    Rejetée si : vide, réponse au lieu d'une question, produit de la question perdu,
+    ou produit ajouté qui n'apparaît nulle part dans la conversation (invention)."""
+    out = (rewritten or "").strip().splitlines()[0].strip().strip('"«» ') if (rewritten or "").strip() else ""
+    if not out:
+        return question, "reformulation vide"
+    low = out.lower()
+    if any(low.startswith(r) for r in _REFUSALS) or len(out) > 3 * len(question) + 160:
+        return question, "le modèle a répondu au lieu de reformuler"
+    q_p, o_p = products(question), products(out)
+    if q_p and not q_p <= o_p:
+        return question, f"produit de la question perdu ({', '.join(sorted(q_p - o_p))})"
+    convo_p = set().union(*(products(m.get("content", "")) for m in (past or [])))
+    invented = o_p - q_p - convo_p
+    if invented:
+        return question, f"produit absent de la conversation ({', '.join(sorted(invented))})"
+    return out, None
+
+
+def rewrite_messages(past: list[dict], question: str) -> list[dict]:
+    """La conversation est donnée comme un texte à lire, pas comme des tours de dialogue :
+    sinon le modèle la continue et répond (« Je ne trouve pas cette information… »)."""
+    lines = []
+    for m in history_messages(past + [{"role": "user", "content": question}]):
+        if m["role"] == "assistant":
+            if any(m["content"].lower().startswith(r) for r in _REFUSALS):
+                continue  # un refus n'apporte aucun sujet à la conversation
+            lines.append("Assistant : " + m["content"][:300].replace("\n", " ") + ("…" if len(m["content"]) > 300 else ""))
+        else:
+            lines.append("Utilisateur : " + m["content"])
+    convo = "\n".join(lines) or "(vide)"
+    return [{"role": "system", "content": REWRITE},
+            {"role": "user", "content": f"Conversation :\n{convo}\n\nNouvelle question : {question}\n\nQuestion réécrite :"}]
 
 
 def select(found: list[dict], k: int, threshold: float, max_doc: int, max_src: int | None) -> list[dict]:
@@ -103,14 +172,17 @@ def ask(client, session: str, question: str, sources: list[str] | None = None,
     past, hinfo = history.recent(client, session)
     yield ev("history", **hinfo, messages=len(past))
 
-    # 1. reformulation (seulement s'il y a un historique)
+    # 1. reformulation : seulement s'il y a un historique ET que la question en dépend
     standalone = question
     if use_rag and past:
-        msgs = [{"role": "system", "content": REWRITE}] + history_messages(past) + \
-               [{"role": "user", "content": f"Nouvelle question : {question}"}]
-        standalone, info = llm.complete(msgs, max_tokens=120)
-        standalone = standalone.strip().strip('"«» ') or question
-        yield ev("rewrite", original=question, standalone=standalone, model=settings.chat_model, **info)
+        if not needs_rewrite(question):
+            yield ev("rewrite", original=question, standalone=question, skipped=True,
+                     reason="question autonome : pas de reformulation")
+        else:
+            raw, info = llm.complete(rewrite_messages(past, question), max_tokens=120)
+            standalone, rejected = check_rewrite(question, raw, past)
+            yield ev("rewrite", original=question, standalone=standalone, model=settings.chat_model,
+                     proposed=raw if rejected else None, rejected=rejected, **info)
 
     results: list[dict] = []
     found: list[dict] = []

@@ -174,12 +174,17 @@ const STEP = {
 };
 let stepNo = 0;
 function stepCard(name, d){
-  const [title, kind] = STEP[name] || [name, ""]; stepNo++;
+  let [title, kind] = STEP[name] || [name, ""]; stepNo++;
+  if(name === "rewrite" && d.skipped) kind = "règle";
   const ms = d.ms ?? d.total_ms;
   const el = document.createElement("div"); el.className = "step";
   let body = "";
   if(name === "history") body = `<div class="sub">${d.messages} message(s) repris comme contexte de conversation</div><div class="console">${esc(d.command)}</div>`;
-  if(name === "rewrite") body = `<div class="sub">« ${esc(d.original)} »</div><div>→ <b>${esc(d.standalone)}</b></div><div class="sub">${esc(d.model)}</div>`;
+  if(name === "rewrite") body = d.skipped
+    ? `<div class="sub">« ${esc(d.original)} »</div><div>→ envoyée telle quelle</div><div class="sub">${esc(d.reason)}</div>`
+    : `<div class="sub">« ${esc(d.original)} »</div><div>→ <b>${esc(d.standalone)}</b></div>` +
+      (d.rejected ? `<div class="sub">proposition du modèle écartée (${esc(d.rejected)}) : « ${esc(d.proposed)} »</div>` : "") +
+      `<div class="sub">${esc(d.model)}</div>`;
   if(name === "embed") body = `<div class="sub">${esc(d.model)} · ${d.dim} dimensions</div><div class="console">[${d.preview.join(", ")}, …]</div>`;
   if(name === "search") body = `<div class="console">${esc(d.command)}</div>` +
       `<div class="sub">${d.results.length} candidats → <b>${d.kept} extrait(s) donnés au modèle</b> · seuil ${d.threshold} · ≤ ${d.max_per_doc} par page${d.max_per_source ? ` · ≤ ${d.max_per_source} par source` : ""}</div>` +

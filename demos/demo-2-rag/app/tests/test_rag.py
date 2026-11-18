@@ -251,3 +251,52 @@ def test_select_diversifies_by_page_and_source():
     assert found[2]["status"] == "même page" and found[5]["status"] == "même source" and found[7]["status"] == "seuil"
     # une seule source imposée : pas de plafond par source
     assert [r["doc_id"] for r in rag.select([dict(r) for r in found[:6]], 5, 0.60, 2, None)] == ["a1", "a1", "o1", "a2", "a3"]
+
+
+# --------------------------------------------------------------------------- reformulation (questions qui s'entremêlent)
+
+def test_needs_rewrite_only_for_follow_ups():
+    assert not rag.needs_rewrite("Comment créer un index vectoriel dans Valkey ?")
+    assert not rag.needs_rewrite("Comment créer un index vectoriel ?")
+    assert rag.needs_rewrite("Et avec plusieurs valeurs de tag ?")
+    assert rag.needs_rewrite("Comment je fais ça sur Aiven ?")
+    assert rag.needs_rewrite("Et sur OVHcloud ?") and rag.needs_rewrite("Pourquoi ?")
+
+
+def test_check_rewrite_rejects_answers_and_product_swaps():
+    q = "Et pour la configurer ?"
+    assert rag.check_rewrite(q, "Je ne trouve pas cette information dans la base de connaissance.")[1]
+    assert rag.check_rewrite(q, "") == (q, "reformulation vide")
+    q2 = "Comment créer un index vectoriel dans Valkey ?"
+    assert rag.check_rewrite(q2, "Comment créer un index vectoriel dans Elasticsearch ?")[0] == q2   # produit perdu
+    past = [{"role": "user", "content": "Comment créer un index vectoriel dans Valkey ?"}]
+    assert rag.check_rewrite("Et ça marche sur Aiven ?", "Valkey Search marche-t-il sur Aiven et Elasticsearch ?", past)[1]
+    ok = rag.check_rewrite("Et sur Aiven ?", "Comment créer un index vectoriel Valkey sur Aiven ?", past)
+    assert ok == ("Comment créer un index vectoriel Valkey sur Aiven ?", None)
+
+
+def test_rewrite_prompt_is_a_transcript_without_refusals():
+    past = [{"role": "user", "content": "Et pour Elasticsearch ?"},
+            {"role": "assistant", "content": "Je ne trouve pas cette information dans la base de connaissance."}]
+    msgs = rag.rewrite_messages(past, "Et sur Aiven ?")
+    assert [m["role"] for m in msgs] == ["system", "user"]
+    assert "Utilisateur : Et pour Elasticsearch ?" in msgs[1]["content"] and "Je ne trouve" not in msgs[1]["content"]
+
+
+def test_standalone_question_after_other_topic_is_not_rewritten(env):
+    client, calls = env
+    list(rag.ask(client, "s5678", "Est-ce qu'Elasticsearch fait de la recherche hybride ?"))
+    evs = list(rag.ask(client, "s5678", "Comment créer un index vectoriel dans Valkey ?"))
+    rw = next(e for e in evs if e.get("name") == "rewrite")["data"]
+    assert rw["skipped"] and rw["standalone"] == "Comment créer un index vectoriel dans Valkey ?"
+    assert calls["complete"] == 0
+    assert "Elasticsearch" not in calls["stream"][-1][-1]["content"].split("Question :")[-1]
+
+
+def test_bad_rewrite_falls_back_to_original_question(env, monkeypatch):
+    client, calls = env
+    list(rag.ask(client, "s9012", "Comment créer un index vectoriel HNSW ?"))
+    monkeypatch.setattr(llm, "complete", lambda *a, **k: ("Je ne trouve pas cette information.", {"ms": 3}))
+    evs = list(rag.ask(client, "s9012", "Et pour régler la précision ?"))
+    rw = next(e for e in evs if e.get("name") == "rewrite")["data"]
+    assert rw["standalone"] == "Et pour régler la précision ?" and "répondu" in rw["rejected"]
