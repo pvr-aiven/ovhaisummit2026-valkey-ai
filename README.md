@@ -1,6 +1,9 @@
 # Valkey & AI: your cache already searches
 
-Breakout session at the **OVHcloud AI Summit 2026** (19 November 2026, Paris, Carrousel du Louvre), by Philippe VINCENT-ROYOL, Solutions Architect at Aiven.
+Breakout session at the **OVHcloud AI Summit 2026** (19 November 2026, Paris, Carrousel du Louvre), co-presented by:
+
+- **Philippe VINCENT-ROYOL**, Solutions Architect at Aiven
+- **Bastien BELLION**, Architect at OVHcloud
 
 Hybrid search, RAG, semantic caching and agent memory with **Valkey 9.1 + Valkey Search**, on a 100% open source stack: Valkey in Docker, OVHcloud Managed Valkey or Aiven for Valkey; open models on OVHcloud AI Endpoints, or Ollama without Internet.
 
