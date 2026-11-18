@@ -71,6 +71,18 @@
   .mcard.on{border-color:var(--brand2);box-shadow:0 0 0 4px rgba(74,91,255,.12)}
   .mcard b{display:block;font-size:17px}
   .mcard small{color:var(--muted)}
+  .stage.prod{border-style:dashed;background:#fbfbff}
+  .stage.prod .num{background:#fff3e8;color:var(--complex)}
+  .stage.prod.current{border-style:solid}
+  .offpath{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:-6px 0 -10px 52px}
+  .prodsvg{width:100%;height:auto;margin:6px 0 4px}
+  .prodsvg text{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .pcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin:12px 0}
+  .pcard{border:1px solid var(--line);border-left:5px solid var(--brand2);border-radius:10px;padding:10px 12px;font-size:15px;color:var(--muted)}
+  .pcard b{display:block;color:var(--ink);font-size:16px;margin-bottom:2px}
+  .pcard em{font-style:normal;color:var(--ink)}
+  .console.code{white-space:pre;word-break:normal;overflow-x:auto;font-size:13px}
+  .tools{font-size:14px;color:var(--muted);margin:6px 0 0}
   .nav{display:flex;gap:10px;justify-content:flex-end;margin-top:22px}
   .err{color:var(--ko);font-weight:700}
   @media (max-width:1000px){main{grid-template-columns:1fr}}
@@ -107,7 +119,9 @@ const STAGES = [
   {id:"route",   t:"Routage",              s:"FT.SEARCH idx:route KNN 5",       cost:"~1 ms<br>0 €"},
   {id:"model",   t:"Appel du modèle",      s:"petit ou grand modèle",           cost:"1 à 10 s<br>tokens payés"},
   {id:"store",   t:"Mise en cache",        s:"HSET + EXPIRE + SET",             cost:"~1 ms"},
+  {id:"prod",    t:"En production",        s:"Langfuse : traces, juge, retour", cost:"hors du chemin<br>de la réponse"},
 ];
+const PROD = 6;
 const S = {tr:null, step:0, th:0.9, rm:0.45};
 
 function heat(v){ const t = Math.max(-1, Math.min(1, v / 0.08));
@@ -129,9 +143,10 @@ function decide(){
 
 function renderCascade(){
   const c = $("#cascade"), d = decide();
-  c.querySelectorAll(".stage").forEach(x => x.remove());
+  c.querySelectorAll(".stage, .offpath").forEach(x => x.remove());
   STAGES.forEach((st,i) => {
-    const el = document.createElement("div"); el.className = "stage"; el.dataset.i = i;
+    if(i === PROD){ const o = document.createElement("div"); o.className = "offpath"; o.textContent = "Après la démo : en production"; c.appendChild(o); }
+    const el = document.createElement("div"); el.className = "stage" + (i === PROD ? " prod" : ""); el.dataset.i = i;
     let res = "";
     if(d){
       if(i === 0) res = d.exactHit ? "Trouvé : réponse immédiate" : "Absent : on continue";
@@ -140,12 +155,15 @@ function renderCascade(){
       if(i === 3) res = `→ ${d.label === "simple" ? "petit modèle" : "grand modèle"}`;
       if(i === 4) res = short(S.tr.models[d.label].model);
       if(i === 5) res = "Réponse gardée 24 h";
-      if(i <= S.step) el.classList.add("visited", i === d.stop && i < 5 ? "stop" : "pass");
-      if(i > d.stop && d.stop < 5) el.classList.add("skipped");
+      if(i === PROD) res = S.step === PROD ? "Évaluer et corriger en continu" : "";
+      else {
+        if(i <= Math.min(S.step, d.stop)) el.classList.add("visited", i === d.stop && i < 5 ? "stop" : "pass");
+        if(i > d.stop && d.stop < 5) el.classList.add("skipped");
+      }
       if(i === S.step) el.classList.add("current");
     }
     el.innerHTML = `<span class="num">${i+1}</span><div><div class="t">${esc(st.t)}</div><div class="s">${esc(st.s)}</div></div><div class="cost">${st.cost}</div><div class="res">${esc(res)}</div>`;
-    el.onclick = () => { if(!d) return; S.step = Math.min(i, d.stop); renderAll(); };
+    el.onclick = () => { if(!d) return; S.step = i === PROD ? PROD : Math.min(i, d.stop); renderAll(); };
     c.appendChild(el);
   });
   const target = c.querySelectorAll(".stage")[S.step];
@@ -155,7 +173,7 @@ function renderCascade(){
 function renderDetail(){
   const tr = S.tr, d = decide(), box = $("#detail"); if(!tr) return;
   const i = S.step; let h = "";
-  const nav = `<div class="nav"><button class="ghost" onclick="prev()">← Étape précédente</button><button onclick="next()">${i >= d.stop ? "Terminé" : "Étape suivante →"}</button></div>`;
+  const nav = `<div class="nav"><button class="ghost" onclick="prev()">← Étape précédente</button>${i === PROD ? "" : `<button onclick="next()">${i >= d.stop ? "Et en production ? →" : "Étape suivante →"}</button>`}</div>`;
   if(i === 0){
     h = `<h2>1 · Le cache exact</h2><p class="lead">La question est <b>normalisée</b> (minuscules, sans accents ni ponctuation), puis hachée. Si exactement la même question a déjà été posée, sa réponse est là, sans aucun calcul.</p>
       <div class="flow"><span>« ${esc(tr.question)} »</span><span class="arrow">→</span><code>${esc(tr.normalized)}</code><span class="arrow">→</span><code>${esc(tr.exact.key)}</code></div>
@@ -203,11 +221,73 @@ EXPIRE cache:&lt;id&gt; ${tr.cache_ttl}
 SET ${esc(tr.exact.key)} cache:&lt;id&gt; EX ${tr.cache_ttl}</div>
       <div class="verdict ok">Une seule fois payé, ensuite servi par Valkey pendant ${Math.round(tr.cache_ttl/3600)} h.</div>`;
   }
+  if(i === PROD){
+    h = `<h2>7 · En production : évaluer en continu</h2><p class="lead">Dans la démo, les exemples « simple » et « complexe » sont choisis à la main. En production, on <b>mesure</b> : une question est simple si le petit modèle y répond aussi bien que le grand. Langfuse fait l'essentiel, <b>à côté</b> du chemin de la réponse, sans la ralentir.</p>
+      <svg class="prodsvg" viewBox="0 0 820 300" role="img" aria-label="Boucle d'évaluation en production avec Langfuse">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5a5f73"/></marker></defs>
+        <g font-size="14">
+          <rect x="10" y="30" width="130" height="70" rx="12" fill="#fff" stroke="#000e9d" stroke-width="2"/>
+          <text x="75" y="60" text-anchor="middle" font-weight="700" fill="#0b1033">Utilisateur</text><text x="75" y="80" text-anchor="middle" fill="#5a5f73" font-size="12">question / réponse</text>
+          <rect x="190" y="30" width="220" height="70" rx="12" fill="#eef0ff" stroke="#000e9d" stroke-width="2"/>
+          <text x="300" y="60" text-anchor="middle" font-weight="700" fill="#0b1033">Application</text><text x="300" y="80" text-anchor="middle" fill="#5a5f73" font-size="12">cascade 1 → 6 de cette page</text>
+          <rect x="190" y="200" width="220" height="70" rx="12" fill="#000e9d"/>
+          <text x="300" y="230" text-anchor="middle" font-weight="700" fill="#fff">Valkey</text><text x="300" y="250" text-anchor="middle" fill="#d7dcff" font-size="12">cache + exemples du routeur</text>
+          <rect x="500" y="10" width="310" height="280" rx="14" fill="#fff" stroke="#4a5bff" stroke-width="2"/>
+          <text x="655" y="38" text-anchor="middle" font-weight="700" fill="#0b1033">Langfuse (auto-hébergé)</text>
+          <rect x="520" y="54" width="270" height="52" rx="10" fill="#f5f6fb" stroke="#e3e6f3"/>
+          <text x="655" y="76" text-anchor="middle" font-weight="700" fill="#0b1033" font-size="13">Traces</text><text x="655" y="94" text-anchor="middle" fill="#5a5f73" font-size="12">route, modèle, tokens, coût, latence</text>
+          <rect x="520" y="118" width="270" height="74" rx="10" fill="#fff3e8" stroke="#e07a1f"/>
+          <text x="655" y="140" text-anchor="middle" font-weight="700" fill="#0b1033" font-size="13">Évaluateur LLM-as-a-Judge</text><text x="655" y="158" text-anchor="middle" fill="#5a5f73" font-size="12">règle : route = simple, échantillon 2 %</text><text x="655" y="175" text-anchor="middle" fill="#5a5f73" font-size="12">→ score « petit modèle suffisant ? »</text>
+          <rect x="520" y="204" width="270" height="70" rx="10" fill="#f2fbf6" stroke="#0a8f4e"/>
+          <text x="655" y="226" text-anchor="middle" font-weight="700" fill="#0b1033" font-size="13">Experiments</text><text x="655" y="244" text-anchor="middle" fill="#5a5f73" font-size="12">jeu de référence rejoué avant chaque</text><text x="655" y="260" text-anchor="middle" fill="#5a5f73" font-size="12">changement de modèle ou de seuil</text>
+        </g>
+        <g stroke="#5a5f73" stroke-width="2" fill="none" marker-end="url(#ah)">
+          <path d="M140,65 H186"/>
+          <path d="M285,100 V196"/><path d="M315,200 V104"/>
+          <path d="M410,65 H516" stroke-dasharray="6 4"/>
+          <path d="M655,106 V114"/>
+          <path d="M520,170 C470,170 470,235 414,235" stroke="#e07a1f"/>
+          <path d="M75,30 C75,2 600,2 610,8" stroke-dasharray="3 4"/>
+        </g>
+        <g font-size="12" fill="#5a5f73">
+          <text x="231" y="155">KNN</text><text x="323" y="155">HSET</text>
+          <text x="463" y="56" text-anchor="middle">traces</text><text x="463" y="84" text-anchor="middle">OpenTelemetry</text>
+          <text x="455" y="200" text-anchor="middle" fill="#e07a1f" font-weight="700">score = 0 ?</text>
+          <text x="455" y="262" text-anchor="middle" fill="#e07a1f">nouvel exemple</text><text x="455" y="277" text-anchor="middle" fill="#e07a1f">« complexe »</text>
+          <text x="340" y="14" text-anchor="middle">pouce haut / bas (score)</text>
+        </g>
+      </svg>
+      <div class="pcards">
+        <div class="pcard"><b>1 · Tracer</b>Chaque question devient une trace : source (cache exact, sémantique, modèle), vote du routeur, modèle, tokens, coût, latence.</div>
+        <div class="pcard"><b>2 · Juger dans Langfuse</b>Un <em>évaluateur</em> LLM-as-a-Judge (prompt + score) et une <em>règle</em> (filtre route = simple, échantillon 2 %). Langfuse appelle le juge et écrit le score : rien à coder.</div>
+        <div class="pcard"><b>3 · Corriger le routeur</b>Seul morceau à écrire : un petit job lit les scores à 0 et ajoute la question comme exemple « complexe » dans Valkey, effet immédiat.</div>
+        <div class="pcard"><b>4 · Ne pas régresser</b>Un jeu de référence (<em>dataset</em>) rejoué en <em>Experiments</em> avant de changer de modèle, de prompt ou de seuil.</div>
+      </div>
+      <div class="console code"># Exemple simplifié (SDK Python Langfuse)
+from langfuse import get_client
+langfuse = get_client()                    # LANGFUSE_HOST = votre instance auto-hébergée
+
+# 1. une observation racine par question, avec la décision du routeur en métadonnées
+def answer(question):
+    with langfuse.start_as_current_observation(as_type="span", name="question") as span:
+        r = pipeline.ask(question)         # étapes 1 → 6
+        span.update(input=question, output=r.answer,
+                    metadata={"source": r.source, "route": r.route, "model": r.model, "cost_eur": r.cost})
+        return r
+
+# 2. dans l'interface Langfuse : évaluateur LLM-as-a-Judge + règle (route = simple, 2 %)
+
+# 3. job périodique : réponses jugées insuffisantes → exemples « complexe » du routeur
+for s in low_scores(name="petit_modele_suffisant", last="1h"):   # lecture via l'API Langfuse
+    router.add_example(valkey, s.question, "complex", embed(s.question), origin="juge")</div>
+      <p class="tools">À savoir : le modèle juge passe par une « LLM connection » de Langfuse et doit accepter les sorties structurées (JSON schema). Les évaluateurs se posent sur l'observation racine (les évaluateurs au niveau trace sont dépréciés). Alternatives : Opik, Arize Phoenix ; Ragas, DeepEval, promptfoo pour les tests.</p>
+      <div class="verdict ok">Le cache rapporte dès le premier jour ; l'évaluation continue garde le routage honnête.</div>`;
+  }
   box.innerHTML = h + nav;
 }
 function renderAll(){ renderCascade(); renderDetail(); }
-function next(){ const d = decide(); if(d && S.step < d.stop){ S.step++; renderAll(); } }
-function prev(){ if(S.step > 0){ S.step--; renderAll(); } }
+function next(){ const d = decide(); if(!d) return; if(S.step < d.stop) S.step++; else if(S.step !== PROD) S.step = PROD; else return; renderAll(); }
+function prev(){ const d = decide(); if(S.step === PROD && d){ S.step = d.stop; renderAll(); } else if(S.step > 0){ S.step--; renderAll(); } }
 document.addEventListener("keydown", e => { if(e.target.tagName === "INPUT" && e.target.type === "text") return;
   if(["ArrowRight","PageDown"," "].includes(e.key)){ e.preventDefault(); next(); }
   if(["ArrowLeft","PageUp"].includes(e.key)){ e.preventDefault(); prev(); } });
@@ -226,7 +306,7 @@ async function analyse(){
 $("#go").onclick = analyse;
 $("#fresh").onchange = analyse;
 $("#q").onkeydown = e => { if(e.key === "Enter") analyse(); };
-$("#th").oninput = e => { S.th = +e.target.value; $("#thv").textContent = S.th; const d = decide(); if(d) S.step = Math.min(S.step, d.stop); renderAll(); };
+$("#th").oninput = e => { S.th = +e.target.value; $("#thv").textContent = S.th; const d = decide(); if(d && S.step !== PROD) S.step = Math.min(S.step, d.stop); renderAll(); };
 $("#rm").oninput = e => { S.rm = +e.target.value; $("#rmv").textContent = S.rm; renderAll(); };
 window.addEventListener("resize", renderCascade);
 

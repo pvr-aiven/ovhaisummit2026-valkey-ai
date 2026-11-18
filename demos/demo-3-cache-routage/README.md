@@ -29,7 +29,7 @@ Bonus : sous chaque réponse, « c'était simple / complexe » ajoute la questio
 
 http://localhost:8002/comment-ca-marche rejoue la **cascade** pour la dernière question posée (ou n'importe quelle question saisie), avec les vraies valeurs, **sans appeler le modèle de génération** :
 
-1. cache exact (question normalisée → empreinte → `GET`) · 2. vecteur BGE-M3 · 3. cache sémantique (3 questions en cache les plus proches, jauge du seuil) · 4. routage (5 exemples voisins, leur étiquette, le vote, le seuil de prudence) · 5. modèle choisi et ses prix · 6. mise en cache.
+1. cache exact (question normalisée → empreinte → `GET`) · 2. vecteur BGE-M3 · 3. cache sémantique (3 questions en cache les plus proches, jauge du seuil) · 4. routage (5 exemples voisins, leur étiquette, le vote, le seuil de prudence) · 5. modèle choisi et ses prix · 6. mise en cache. · 7. **en production** (hors du chemin de la réponse) : schéma de la boucle d'évaluation continue avec Langfuse auto-hébergé (traces, évaluateur LLM-as-a-Judge sur 2 % des réponses du petit modèle, Experiments sur un jeu de référence), un petit job qui renvoie les réponses jugées insuffisantes comme exemples « complexe » du routeur dans Valkey, et un exemple de code simplifié.
 
 Une bulle descend la cascade à chaque appui sur → (télécommande compatible) et s'arrête à l'étape qui répond. Deux curseurs permettent de **changer les seuils en direct** : à 0,70, la question « … et Memcached ? » serait servie par le cache avec la réponse sur Redis, ce qui montre pourquoi le seuil est à 0,90. Par défaut, la question analysée ignore sa propre réponse en cache (pour rejouer son premier passage) ; une case permet de voir l'état actuel.
 
