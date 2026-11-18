@@ -95,6 +95,19 @@
   .ibox.lit{border-color:var(--brand2);box-shadow:0 0 0 6px rgba(74,91,255,.12)}
   .ibox h3{margin:0 0 4px;font-size:20px}.ibox .ty{font:14px ui-monospace,Menlo,monospace;color:var(--brand2)}
   .ibox p{font-size:15px;color:var(--muted);margin:8px 0 10px}
+  .hinfo{margin-top:16px;border:1px solid var(--line);border-radius:14px;background:#fafbff;padding:14px 16px}
+  .hinfo h3{margin:0 0 10px;font-size:18px}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .hp{background:#fff;border:1px solid var(--line);border-left:5px solid var(--brand2);border-radius:10px;padding:10px 12px;font-size:14px;color:var(--muted)}
+  .hp b{display:block;font:16px ui-monospace,Menlo,monospace;color:var(--ink);margin-bottom:4px}
+  .hp em{font-style:normal;color:var(--ink)}
+  .hlev{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:16px;margin-top:12px;align-items:start}
+  .hlev .f{font:15px ui-monospace,Menlo,monospace;background:var(--code);color:var(--codeink);border-radius:10px;padding:10px 12px;line-height:1.6}
+  .hlev table{width:100%;border-collapse:collapse;font-size:14px}
+  .hlev td,.hlev th{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left}
+  .hlev th{color:var(--muted);font-weight:600}
+  .hlev .barl{height:10px;background:var(--brand2);border-radius:3px;min-width:2px}
+  @media (max-width:800px){.hlev{grid-template-columns:1fr}}
   .bucket{display:flex;gap:6px;align-items:center;font:14px ui-monospace,Menlo,monospace;margin:5px 0}
   .bucket span{background:#eef0ff;border-radius:6px;padding:2px 8px}
   .bucket em{font-style:normal;color:var(--muted)}
@@ -215,6 +228,18 @@
         <div class="ibox" id="ib0"><h3>TAG</h3><div class="ty">gender · category · color</div><p>Pour chaque valeur, la liste des produits : filtre exact instantané.</p><div id="buckets"></div></div>
         <div class="ibox" id="ib1"><h3>NUMERIC</h3><div class="ty">price · stock</div><p>Valeurs triées : un intervalle se lit directement.</p><div class="axis" id="axis"></div></div>
         <div class="ibox" id="ib2"><h3>VECTOR · HNSW</h3><div class="ty" id="hnswParams"></div><p>Un graphe de voisinage à plusieurs niveaux pour trouver les plus proches sans tout comparer.</p><svg id="miniHnsw" viewBox="0 0 300 120" width="100%" height="120"></svg></div>
+      </div>
+      <div class="hinfo" id="hinfo">
+        <h3>Réglages HNSW : ce que veulent dire les valeurs</h3>
+        <div class="hgrid">
+          <div class="hp"><b id="hpM"></b>Nombre de <em>liens par vecteur</em> à chaque niveau (2 × M au niveau 0). Fixe aussi combien de points montent d'un étage : environ 1 sur M. Plus grand : meilleur rappel, plus de mémoire. Défaut courant, recommandé entre 5 et 48.</div>
+          <div class="hp"><b id="hpEfc"></b>Candidats examinés <em>à l'insertion</em> (chaque HSET) pour choisir les M voisins. Plus grand : graphe de meilleure qualité, indexation plus lente. Fixé à la création de l'index.</div>
+          <div class="hp"><b id="hpEfr"></b>Candidats gardés <em>pendant la recherche</em>, au niveau 0. Doit être ≥ k (KNN 12) : on prend 2 à 10 × k. Plus grand : meilleur rappel, requête plus lente. Modifiable par requête : <code>[KNN 12 @embedding $vec EF_RUNTIME 128 AS score]</code>.</div>
+        </div>
+        <div class="hlev">
+          <div class="f" id="hFormula"></div>
+          <table id="hLevels"></table>
+        </div>
       </div>
       <div class="code schema" id="schema"></div>
     </section>
@@ -386,15 +411,30 @@ function miniHnsw(svg){
     pts.forEach(a => el("circle", {cx:a[0], cy:a[1], r: li===0 ? 4 : 3, fill:"#4a5bff"}, svg));
   });
 }
+function hnswInfo(d){
+  const M = d.hnsw.m, N = d.num_docs || 0;
+  $("#hpM").textContent = `M = ${M}`;
+  $("#hpEfc").textContent = `EF_CONSTRUCTION = ${d.hnsw.ef_construction}`;
+  $("#hpEfr").textContent = `EF_RUNTIME = ${d.hnsw.ef_runtime}`;
+  const x = N > 1 ? Math.log(N) / Math.log(M) : 0, lo = Math.floor(x), hi = Math.ceil(x), top = lo;
+  $("#hFormula").innerHTML = `Niveau d'un vecteur, tiré au sort à l'insertion :<br>niveau = ⌊ −ln(U) / ln(M) ⌋, U ∈ ]0, 1]<br>→ environ 1 point sur M monte d'un étage<br>→ niveau le plus haut ≈ log<sub>M</sub>(N)<br>ici : log<sub>${M}</sub>(${N.toLocaleString("fr-FR")}) ≈ ${x.toFixed(1).replace(".", ",")} → niveau le plus haut ${lo === hi ? lo : lo + " ou " + hi}, soit ${lo === hi ? lo + 1 : (lo + 1) + " ou " + (hi + 1)} niveaux`;
+  const rows = [];
+  for(let l = 0; l <= hi; l++){ const n = N / Math.pow(M, l); if(l > 0 && n < 0.5) break; rows.push([l, n]); }
+  $("#hLevels").innerHTML = `<tr><th>Niveau</th><th>Vecteurs attendus (N / M<sup>niveau</sup>)</th><th></th></tr>` +
+    rows.map(([l,n]) => `<tr><td>${l}</td><td>≈ ${n >= 10 ? Math.round(n).toLocaleString("fr-FR") : n.toFixed(1).replace(".", ",")}${l === 0 ? " (tous)" : ""}</td>
+      <td style="width:40%"><div class="barl" style="width:${Math.max(1, 100 * n / N)}%"></div></td></tr>`).reverse().join("") +
+    `<tr><td colspan="3" style="color:var(--muted);border:0">Valeurs moyennes : le tirage réel varie d'un index à l'autre. Le niveau le plus haut a souvent un seul point, le point d'entrée.</td></tr>`;
+}
 function enter3(){
   const d = S.data, p = d.product.fields;
-  $("#hnswParams").textContent = `dim ${d.dim} · COSINE · M ${d.hnsw.m} · EF ${d.hnsw.ef_construction}`;
+  $("#hnswParams").textContent = `dim ${d.dim} · COSINE · M ${d.hnsw.m} · EF_CONSTRUCTION ${d.hnsw.ef_construction} · EF_RUNTIME ${d.hnsw.ef_runtime}`;
   $("#buckets").innerHTML = [["gender", p.gender], ["category", p.category], ["color", p.color]]
     .map(([k,v]) => `<div class="bucket"><span>${k}:{${esc(v)}}</span><em>→ ${esc(d.product.key)}, …</em></div>`).join("");
   const price = +p.price, pos = Math.min(96, Math.max(4, price / 2));
   $("#axis").innerHTML = [10,30,50,70,90].map(x => `<i style="left:${x}%"></i>`).join("") +
     `<b style="left:${pos}%"></b><small style="left:0">0 €</small><small style="right:0">200 €</small><small style="left:${pos}%;transform:translateX(-50%);top:-6px;color:#ff8a3d;font-weight:700">${price.toFixed(2)} €</small>`;
   miniHnsw($("#miniHnsw"));
+  hnswInfo(d);
   $("#schema").innerHTML = esc(d.schema).replace(/(FT\.CREATE)/, '<span class="k">$1</span>').replace(/(VECTOR HNSW)/, '<span class="b">$1</span>');
   const wires = $$("#wires span"); wires.forEach(w => w.classList.remove("lit")); $$(".ibox").forEach(b => b.classList.remove("lit"));
   wires.forEach((w,i) => later(() => { w.classList.add("lit"); $("#ib"+w.dataset.i).classList.add("lit"); }, 500 + i*450));
